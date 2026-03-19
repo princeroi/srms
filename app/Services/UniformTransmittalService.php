@@ -14,6 +14,41 @@ class UniformTransmittalService
     private const COMPANY_LOGO    = '/images/logo.png';
 
     /**
+     * Generate transmittal from a saved Transmittal DB record.
+     * Uses items_summary stored at the time of transmittal creation.
+     */
+    public static function generateFromTransmittal(
+        \App\Models\UniformIssuances $issuance,
+        \App\Models\Transmittals $transmittal
+    ): string {
+        $issuance->loadMissing('site', 'uniformIssuanceType');
+
+        $rows = [];
+        foreach ($transmittal->items_summary as $row) {
+            $rows[] = [
+                'employee'  => $row['employee']  ?? '—',
+                'item_name' => $row['item_name'] ?? '—',
+                'size'      => $row['size']      ?? '',
+                'qty'       => (int) ($row['qty'] ?? 0),
+            ];
+        }
+
+        $data = [
+            'transmittal_number' => $transmittal->transmittal_number,
+            'transmitted_by'     => $transmittal->transmitted_by,
+            'transmitted_to'     => $transmittal->transmitted_to,
+            'issuance_type'      => $issuance->uniformIssuanceType?->uniform_issuance_type_name ?? '—',
+            'purpose'            => $transmittal->purpose ?? '',
+            'instructions'       => $transmittal->instructions ?? '',
+            'date'               => \Carbon\Carbon::parse($transmittal->transmitted_at)->timezone('Asia/Manila')->format('F d, Y'),
+            'rows'               => self::mergeRows($rows),
+        ];
+
+        $siteName = $issuance->site?->site_name ?? '';
+        return self::wrapDocument([$data], "Transmittal {$transmittal->transmittal_number} — {$siteName}");
+    }
+
+    /**
      * Generate transmittal from a single issuance.
      * Uses current released_quantity from DB (complete state).
      */
@@ -42,6 +77,45 @@ class UniformTransmittalService
 
         $siteName = $issuance->site?->site_name ?? '';
         $title    = "Transmittal — {$siteName}";
+
+        return self::wrapDocument([$data], $title);
+    }
+
+    /**
+     * Generate transmittal from a saved Transmittal DB record.
+     * Uses items_summary stored at the time of saving.
+     */
+    public static function generateFromSaved(
+        UniformIssuances $issuance,
+        \App\Models\Transmittals $transmittal
+    ): string {
+        $issuance->loadMissing('site', 'uniformIssuanceType');
+
+        $rows = [];
+        foreach ($transmittal->items_summary as $row) {
+            $rows[] = [
+                'employee'  => $row['employee']  ?? '—',
+                'item_name' => $row['item_name'] ?? '—',
+                'size'      => $row['size']      ?? '',
+                'qty'       => (int) ($row['qty'] ?? 0),
+            ];
+        }
+
+        $data = [
+            'transmittal_number' => $transmittal->transmittal_number,
+            'transmitted_by'     => $transmittal->transmitted_by,
+            'transmitted_to'     => $transmittal->transmitted_to,
+            'issuance_type'      => $issuance->uniformIssuanceType?->uniform_issuance_type_name ?? '—',
+            'purpose'            => $transmittal->purpose ?? '',
+            'instructions'       => $transmittal->instructions ?? '',
+            'date'               => \Carbon\Carbon::parse($transmittal->transmitted_at)
+                                        ->timezone('Asia/Manila')
+                                        ->format('F d, Y'),
+            'rows'               => self::mergeRows($rows),
+        ];
+
+        $siteName = $issuance->site?->site_name ?? '';
+        $title    = "Transmittal #{$transmittal->transmittal_number} — {$siteName}";
 
         return self::wrapDocument([$data], $title);
     }
@@ -128,7 +202,7 @@ class UniformTransmittalService
             'purpose'        => $purpose,
             'instructions'   => $instructions,
             'date'           => $logDate,
-            'rows'           => $rows,
+            'rows'           => self::mergeRows($rows),
         ];
 
         $siteName = $issuance->site?->site_name ?? '';
@@ -169,12 +243,34 @@ class UniformTransmittalService
             'purpose'        => $purpose,
             'instructions'   => $instructions,
             'date'           => \Carbon\Carbon::parse($dateSource)->timezone('Asia/Manila')->format('F d, Y'),
-            'rows'           => $rows,
+            'rows'           => self::mergeRows($rows),
         ];
+    }
+
+    /**
+     * Merge rows by item_name + size, summing quantities.
+     * Employee name is dropped — transmittal only shows item + size + total qty.
+     */
+    private static function mergeRows(array $rows): array
+    {
+        $merged = [];
+        foreach ($rows as $row) {
+            $key = trim($row['item_name'] ?? '') . '||' . trim($row['size'] ?? '');
+            if (!isset($merged[$key])) {
+                $merged[$key] = [
+                    'item_name' => $row['item_name'] ?? '—',
+                    'size'      => $row['size'] ?? '',
+                    'qty'       => 0,
+                ];
+            }
+            $merged[$key]['qty'] += (int) ($row['qty'] ?? 0);
+        }
+        return array_values($merged);
     }
 
     private static function renderPage(array $d): string
     {
+        $txnNo        = e($d['transmittal_number'] ?? '—');
         $txnBy        = e($d['transmitted_by']);
         $txnTo        = e($d['transmitted_to']);
         $date         = e($d['date']);
@@ -195,11 +291,10 @@ class UniformTransmittalService
 
         foreach ($rows as $i => $row) {
             $no       = $i + 1;
-            $employee = e($row['employee']);
             $itemName = e($row['item_name']);
             $size     = !empty($row['size']) ? ' (' . e($row['size']) . ')' : '';
             $qty      = (int) $row['qty'];
-            $desc     = "{$employee} - {$itemName}{$size}";
+            $desc     = "{$itemName}{$size}";
 
             $itemRows .= "
                 <tr class='data-row'>
@@ -231,6 +326,8 @@ class UniformTransmittalService
     <table class="dept-row">
         <tr>
             <td class="dept-name">{$dept}</td>
+            <td class="no-label">No.</td>
+            <td class="no-value">{$txnNo}</td>
         </tr>
     </table>
 
@@ -381,6 +478,8 @@ body{font-family:Arial,sans-serif;background:#d1d9e6;color:#000;}
 .dept-row{width:100%;border-collapse:collapse;border:1.5px solid #000;border-top:none;flex-shrink:0;}
 .dept-row td{padding:2.5mm 3mm;border:1px solid #000;vertical-align:middle;background:#1a237e;color:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 .dept-name{font-size:14pt;font-weight:700;text-transform:uppercase;letter-spacing:.06em;text-align:center;color:#fff;}
+.no-label{font-size:9.5pt;font-weight:700;width:18mm;text-align:center;border-left:2px solid rgba(255,255,255,.3);white-space:nowrap;color:#fff;}
+.no-value{font-size:12pt;font-weight:900;color:#93c5fd;width:30mm;text-align:center;white-space:nowrap;}
 
 .meta-table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid #ccc;border-top:none;flex-shrink:0;}
 .meta-table td{padding:1.8mm 3mm;border-bottom:1px solid #ccc;border-right:1px solid #ccc;font-size:10pt;vertical-align:middle;}

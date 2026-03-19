@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\UniformIssuances;
 use App\Models\UniformIssuanceLog;
+use App\Models\Transmittals;
 use App\Services\UniformTransmittalService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -11,8 +12,8 @@ use Illuminate\Support\Facades\Auth;
 class UniformIssuanceTransmittalController extends Controller
 {
     /**
-     * Full transmittal — all released items from DB (current state).
-     * Accepts ?transmitted_to=, ?transmitted_by=, ?purpose=, ?instructions= from query string.
+     * Print transmittal by transmittal ID (saved record).
+     * Called after saving from the modal action.
      */
     public function issuance(UniformIssuances $issuance, Request $request): \Illuminate\Http\Response
     {
@@ -23,6 +24,22 @@ class UniformIssuanceTransmittalController extends Controller
             404, 'Transmittal only available for partial or issued issuances.'
         );
 
+        // If a saved transmittal ID is passed, load from DB
+        $transmittalId = $request->query('transmittal');
+
+        if ($transmittalId) {
+            $transmittal = Transmittals::where('id', $transmittalId)
+                ->where('uniform_issuance_id', $issuance->id)
+                ->firstOrFail();
+
+            return response(
+                UniformTransmittalService::generateFromSaved($issuance, $transmittal),
+                200,
+                ['Content-Type' => 'text/html; charset=UTF-8']
+            );
+        }
+
+        // Fallback: generate from query params (preview mode)
         return response(
             UniformTransmittalService::generateFromIssuance(
                 $issuance,
@@ -37,8 +54,7 @@ class UniformIssuanceTransmittalController extends Controller
     }
 
     /**
-     * Batch transmittal — only items released in a specific log entry.
-     * Used for individual batch cards in the modal.
+     * Print transmittal for a specific batch log entry.
      */
     public function fromLog(UniformIssuances $issuance, UniformIssuanceLog $log, Request $request): \Illuminate\Http\Response
     {
