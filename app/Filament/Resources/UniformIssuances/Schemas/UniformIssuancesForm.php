@@ -56,6 +56,7 @@ class UniformIssuancesForm
                     ->visible(fn ($get) => $get('uniform_issuance_status') === 'issued'),
                 Textarea::make('notes')
                     ->columnSpanFull(),
+
                 Repeater::make('uniformIssuanceRecipient')
                     ->relationship('uniformIssuanceRecipient')
                     ->schema([
@@ -98,11 +99,11 @@ class UniformIssuancesForm
                                 $set('uniformIssuanceItem', $setItems);
                             }),
 
-                        Repeater::make('uniformIssuanceItem') 
+                        Repeater::make('uniformIssuanceItem')
                             ->relationship('uniformIssuanceItem')
                             ->schema([
                                 Select::make('uniform_item_id')
-                                    ->options(UniformItems::pluck('uniform_item_name', 'id')) 
+                                    ->options(UniformItems::pluck('uniform_item_name', 'id'))
                                     ->required()
                                     ->searchable()
                                     ->reactive()
@@ -129,7 +130,7 @@ class UniformIssuancesForm
                                         $variantId = $get('uniform_item_variant_id');
                                         if (!$variantId) return null;
                                         $variant = UniformItemVariants::find($variantId);
-                                        if(!$variant) return null;
+                                        if (!$variant) return null;
                                         $stock = (int) $variant->uniform_item_quantity;
                                         return $stock > 0 ? 'success' : 'danger';
                                     }),
@@ -143,7 +144,7 @@ class UniformIssuancesForm
                                                 $variantId = $get('uniform_item_variant_id');
                                                 if (!$variantId) return;
                                                 $variant = UniformItemVariants::find($variantId);
-                                                if(!$variant) return;
+                                                if (!$variant) return;
                                                 $stock = (int) $variant->uniform_item_quantity;
                                                 $qty = (int) $value;
                                                 if ($qty > $stock) {
@@ -157,7 +158,6 @@ class UniformIssuancesForm
                                     ->default(0)
                                     ->hidden()
                                     ->dehydrated(),
-
                                 TextInput::make('remaining_quantity')
                                     ->numeric()
                                     ->default(0)
@@ -186,66 +186,95 @@ class UniformIssuancesForm
                             ])
                             ->columns(3)
                             ->columnSpan('full'),
-
-                            \Filament\Forms\Components\Placeholder::make('recipient_summary')
-                                ->label('Recipient Item Summary')
-                                ->content(function (callable $get) {
-                                    $items = $get('uniformIssuanceItem') ?? [];
-                                    if (empty($items)) return new \Illuminate\Support\HtmlString('<span style="color:#9ca3af;">No items added yet.</span>');
-
-                                    $rows = '';
-                                    $totalQty = 0;
-
-                                    foreach ($items as $item) {
-                                        $variantId = $item['uniform_item_variant_id'] ?? null;
-                                        $itemId    = $item['uniform_item_id'] ?? null;
-                                        $qty       = (int) ($item['quantity'] ?? 0);
-                                        $totalQty += $qty;
-
-                                        $itemName    = $itemId    ? (\App\Models\UniformItems::find($itemId)?->uniform_item_name ?? '—') : '—';
-                                        $variantName = $variantId ? (UniformItemVariants::find($variantId)?->uniform_item_size ?? '—') : '—';
-                                        $stock       = $variantId ? (int) (UniformItemVariants::find($variantId)?->uniform_item_quantity ?? 0) : 0;
-                                        $enough      = $qty <= $stock;
-                                        $statusColor = $enough ? '#16a34a' : '#dc2626';
-                                        $statusIcon  = $enough ? '✅' : '⛔';
-
-                                        $rows .= "
-                                            <tr>
-                                                <td style='padding:4px 8px;font-size:11px;border-bottom:1px solid #e5e7eb;'>{$itemName}</td>
-                                                <td style='padding:4px 8px;font-size:11px;border-bottom:1px solid #e5e7eb;text-align:center;'>{$variantName}</td>
-                                                <td style='padding:4px 8px;font-size:11px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700;'>{$qty}</td>
-                                                <td style='padding:4px 8px;font-size:11px;border-bottom:1px solid #e5e7eb;text-align:center;color:#374151;'>{$stock}</td>
-                                                <td style='padding:4px 8px;font-size:11px;border-bottom:1px solid #e5e7eb;text-align:center;color:{$statusColor};'>{$statusIcon}</td>
-                                            </tr>";
-                                    }
-
-                                    return new \Illuminate\Support\HtmlString("
-                                        <table style='width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;'>
-                                            <thead>
-                                                <tr style='background:#1e3a5f;'>
-                                                    <th style='padding:6px 8px;font-size:10px;color:#fff;text-align:left;'>Item</th>
-                                                    <th style='padding:6px 8px;font-size:10px;color:#fff;text-align:center;'>Size</th>
-                                                    <th style='padding:6px 8px;font-size:10px;color:#fff;text-align:center;'>Qty</th>
-                                                    <th style='padding:6px 8px;font-size:10px;color:#fff;text-align:center;'>In Stock</th>
-                                                    <th style='padding:6px 8px;font-size:10px;color:#fff;text-align:center;'>OK?</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>{$rows}</tbody>
-                                            <tfoot>
-                                                <tr style='background:#f8fafc;'>
-                                                    <td colspan='2' style='padding:5px 8px;font-size:11px;font-weight:700;color:#374151;'>Total Items</td>
-                                                    <td style='padding:5px 8px;font-size:12px;font-weight:900;color:#1d4ed8;text-align:center;'>{$totalQty}</td>
-                                                    <td colspan='2'></td>
-                                                </tr>
-                                            </tfoot>
-                                        </table>
-                                    ");
-                                })
-                                ->columnSpanFull(),
-                        
                     ])
                     ->columns(4)
                     ->columnSpan('full')
+                    ->live(),
+
+                // ─── GLOBAL SUMMARY (outside the repeater) ───────────────────────────────
+                Placeholder::make('global_issuance_summary')
+                    ->label('Recipient Item Summary')
+                    ->content(function (callable $get) {
+                        $recipients = $get('uniformIssuanceRecipient') ?? [];
+
+                        if (empty($recipients)) {
+                            return new HtmlString('<span style="color:#9ca3af;">No recipients added yet.</span>');
+                        }
+
+                        // Aggregate: itemId_variantId => [ itemName, variantName, stock, totalQty ]
+                        $aggregated = [];
+                        $grandTotal = 0;
+
+                        foreach ($recipients as $recipient) {
+                            $items = $recipient['uniformIssuanceItem'] ?? [];
+
+                            foreach ($items as $item) {
+                                $variantId = $item['uniform_item_variant_id'] ?? null;
+                                $itemId    = $item['uniform_item_id'] ?? null;
+                                $qty       = (int) ($item['quantity'] ?? 0);
+
+                                $grandTotal += $qty;
+                                $key = ($itemId ?? 'null') . '_' . ($variantId ?? 'null');
+
+                                if (!isset($aggregated[$key])) {
+                                    $itemModel    = $itemId    ? UniformItems::find($itemId)         : null;
+                                    $variantModel = $variantId ? UniformItemVariants::find($variantId) : null;
+
+                                    $aggregated[$key] = [
+                                        'item_name'    => $itemModel?->uniform_item_name      ?? '—',
+                                        'variant_name' => $variantModel?->uniform_item_size   ?? '—',
+                                        'stock'        => (int) ($variantModel?->uniform_item_quantity ?? 0),
+                                        'total_qty'    => 0,
+                                    ];
+                                }
+
+                                $aggregated[$key]['total_qty'] += $qty;
+                            }
+                        }
+
+                        if (empty($aggregated)) {
+                            return new HtmlString('<span style="color:#9ca3af;">No items added yet.</span>');
+                        }
+
+                        $rows = '';
+                        foreach ($aggregated as $data) {
+                            $enough      = $data['total_qty'] <= $data['stock'];
+                            $statusColor = $enough ? '#16a34a' : '#dc2626';
+                            $statusIcon  = $enough ? '✅' : '⛔';
+
+                            $rows .= "
+                                <tr>
+                                    <td style='padding:4px 8px;font-size:11px;border-bottom:1px solid #e5e7eb;'>{$data['item_name']}</td>
+                                    <td style='padding:4px 8px;font-size:11px;border-bottom:1px solid #e5e7eb;text-align:center;'>{$data['variant_name']}</td>
+                                    <td style='padding:4px 8px;font-size:11px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700;'>{$data['total_qty']}</td>
+                                    <td style='padding:4px 8px;font-size:11px;border-bottom:1px solid #e5e7eb;text-align:center;color:#374151;'>{$data['stock']}</td>
+                                    <td style='padding:4px 8px;font-size:11px;border-bottom:1px solid #e5e7eb;text-align:center;color:{$statusColor};'>{$statusIcon}</td>
+                                </tr>";
+                        }
+
+                        return new HtmlString("
+                            <table style='width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;'>
+                                <thead>
+                                    <tr style='background:#1e3a5f;'>
+                                        <th style='padding:6px 8px;font-size:10px;color:#fff;text-align:left;'>Item</th>
+                                        <th style='padding:6px 8px;font-size:10px;color:#fff;text-align:center;'>Size</th>
+                                        <th style='padding:6px 8px;font-size:10px;color:#fff;text-align:center;'>Qty</th>
+                                        <th style='padding:6px 8px;font-size:10px;color:#fff;text-align:center;'>In Stock</th>
+                                        <th style='padding:6px 8px;font-size:10px;color:#fff;text-align:center;'>OK?</th>
+                                    </tr>
+                                </thead>
+                                <tbody>{$rows}</tbody>
+                                <tfoot>
+                                    <tr style='background:#f8fafc;'>
+                                        <td colspan='2' style='padding:5px 8px;font-size:11px;font-weight:700;color:#374151;'>Total Items</td>
+                                        <td style='padding:5px 8px;font-size:12px;font-weight:900;color:#1d4ed8;text-align:center;'>{$grandTotal}</td>
+                                        <td colspan='2'></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        ");
+                    })
+                    ->columnSpanFull(),
             ]);
     }
 }

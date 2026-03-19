@@ -61,17 +61,19 @@ class UniformIssuanceReceivingCopyController extends Controller
         );
     }
 
-    public function bulk(Request $request): \Illuminate\Http\Response
+    public function bulk(Request $request): \Illuminate\Http\Response|\Illuminate\Http\RedirectResponse
     {
         abort_unless(Auth::check(), 403);
 
-        $ids = collect(explode(',', $request->query('ids', '')))
-            ->map('trim')
-            ->filter()
-            ->map('intval')
-            ->unique()
-            ->values()
-            ->all();
+        // ── Session-based bulk print (from BulkAction in Filament) ────────
+        $key = 'bulk_print_receiving_' . Auth::id();
+        $ids = session()->pull($key);  // stored as array of IDs now (see note below)
+
+        // ── Fallback: query-string ?ids=1,2,3 ─────────────────────────────
+        if (empty($ids)) {
+            $ids = collect(explode(',', $request->query('ids', '')))
+                ->map('trim')->filter()->map('intval')->unique()->values()->all();
+        }
 
         abort_if(empty($ids), 400, 'No issuance IDs provided.');
 
@@ -81,7 +83,9 @@ class UniformIssuanceReceivingCopyController extends Controller
 
         abort_if($issuances->isEmpty(), 404, 'No eligible issuances found.');
 
-        $slips = [];
+        $slips          = [];
+        $isSalaryDeduct = false;
+
         foreach ($issuances as $issuance) {
             $issuance->loadMissing(
                 'site',
@@ -90,6 +94,10 @@ class UniformIssuanceReceivingCopyController extends Controller
                 'uniformIssuanceRecipient.uniformIssuanceItem.uniformItem',
                 'uniformIssuanceRecipient.uniformIssuanceItem.uniformItemVariant'
             );
+
+            if ($issuance->uniformIssuanceType?->is_salary_deduct) {
+                $isSalaryDeduct = true;
+            }
 
             foreach ($issuance->uniformIssuanceRecipient as $rec) {
                 $items = [];
@@ -102,6 +110,8 @@ class UniformIssuanceReceivingCopyController extends Controller
                         'qty'  => $qty,
                     ];
                 }
+
+                if (empty($items)) continue;
 
                 $slips[] = [
                     'txn_id'           => $rec->transaction_id ?? '—',
@@ -122,10 +132,13 @@ class UniformIssuanceReceivingCopyController extends Controller
 
         abort_if(empty($slips), 404, 'No slips could be generated.');
 
+        $title = 'Bulk Receiving Copy — ' . count($slips) . ' slip(s)';
+
         return response(
-            UniformIssuanceReceivingCopyService::wrapDocument($slips, 'Bulk Receiving Copy', false),
+            UniformIssuanceReceivingCopyService::wrapDocument($slips, $title, $isSalaryDeduct),
             200,
             ['Content-Type' => 'text/html; charset=UTF-8']
         );
     }
+
 }

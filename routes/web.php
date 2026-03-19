@@ -27,10 +27,15 @@ use App\Http\Controllers\UniformIssuanceReceivingCopyController;
 use App\Http\Controllers\UniformIssuanceTransmittalController;
 
 Route::prefix('uniform-issuances')->name('uniform-issuances.')->middleware('auth')->group(function () {
-    Route::get('/{issuance}/receiving-copy', [UniformIssuanceReceivingCopyController::class, 'issuance'])->name('receiving-copy');
-    Route::get('/recipient/{recipient}/receiving-copy', [UniformIssuanceReceivingCopyController::class, 'recipient'])->name('recipient.receiving-copy');
-    Route::get('/bulk/receiving-copy', [UniformIssuanceReceivingCopyController::class, 'bulk'])->name('bulk.receiving-copy');
 
+    // ── Static routes FIRST (before any wildcards) ──────────────────────
+    Route::get('/bulk/receiving-copy', [UniformIssuanceReceivingCopyController::class, 'bulk'])->name('bulk.receiving-copy');
+    Route::get('/recipient/{recipient}/receiving-copy', [UniformIssuanceReceivingCopyController::class, 'recipient'])->name('recipient.receiving-copy');
+
+    // ── Wildcard routes LAST ─────────────────────────────────────────────
+    Route::get('/{issuance}/receiving-copy', [UniformIssuanceReceivingCopyController::class, 'issuance'])->name('receiving-copy');
     Route::get('/{issuance}/transmittal', [UniformIssuanceTransmittalController::class, 'issuance'])->name('transmittal');
     Route::get('/{issuance}/transmittal/log/{log}', [UniformIssuanceTransmittalController::class, 'fromLog'])->name('transmittal.log');
+
 });
+
