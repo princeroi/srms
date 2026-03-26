@@ -20,7 +20,6 @@ class UniformIssuanceReceivingCopyController extends Controller
             404, 'Receiving copy only available for partial or issued issuances.'
         );
 
-        // If a specific log ID is passed, print only that batch's items
         $logId = $request->query('log');
 
         if ($logId) {
@@ -61,21 +60,17 @@ class UniformIssuanceReceivingCopyController extends Controller
         );
     }
 
-    public function bulk(Request $request): \Illuminate\Http\Response|\Illuminate\Http\RedirectResponse
+    public function bulk(Request $request): \Illuminate\Http\Response
     {
         abort_unless(Auth::check(), 403);
 
-        // ── Session-based bulk print (from BulkAction in Filament) ────────
-        $key = 'bulk_print_receiving_' . Auth::id();
-        $ids = session()->pull($key);  // stored as array of IDs now (see note below)
+        $ids = collect(explode(',', $request->query('ids', '')))
+            ->map(fn ($id) => (int) trim($id))
+            ->filter()
+            ->unique()
+            ->values();
 
-        // ── Fallback: query-string ?ids=1,2,3 ─────────────────────────────
-        if (empty($ids)) {
-            $ids = collect(explode(',', $request->query('ids', '')))
-                ->map('trim')->filter()->map('intval')->unique()->values()->all();
-        }
-
-        abort_if(empty($ids), 400, 'No issuance IDs provided.');
+        abort_if($ids->isEmpty(), 400, 'No IDs provided.');
 
         $issuances = UniformIssuances::whereIn('id', $ids)
             ->whereIn('uniform_issuance_status', ['partial', 'issued'])
@@ -83,8 +78,9 @@ class UniformIssuanceReceivingCopyController extends Controller
 
         abort_if($issuances->isEmpty(), 404, 'No eligible issuances found.');
 
-        $slips          = [];
-        $isSalaryDeduct = false;
+        // Collect ALL slips across all issuances — only the "complete" snapshot
+        // (top card from the modal, i.e. current released quantities)
+        $allSlips = [];
 
         foreach ($issuances as $issuance) {
             $issuance->loadMissing(
@@ -95,15 +91,13 @@ class UniformIssuanceReceivingCopyController extends Controller
                 'uniformIssuanceRecipient.uniformIssuanceItem.uniformItemVariant'
             );
 
-            if ($issuance->uniformIssuanceType?->is_salary_deduct) {
-                $isSalaryDeduct = true;
-            }
-
             foreach ($issuance->uniformIssuanceRecipient as $rec) {
                 $items = [];
+
                 foreach ($rec->uniformIssuanceItem as $item) {
                     $qty = (int) ($item->released_quantity ?: $item->quantity);
                     if ($qty <= 0) continue;
+
                     $items[] = [
                         'name' => $item->uniformItem?->uniform_item_name ?? "Item #{$item->uniform_item_id}",
                         'size' => $item->uniformItemVariant?->uniform_item_size ?? '—',
@@ -113,7 +107,7 @@ class UniformIssuanceReceivingCopyController extends Controller
 
                 if (empty($items)) continue;
 
-                $slips[] = [
+                $allSlips[] = [
                     'txn_id'           => $rec->transaction_id ?? '—',
                     'date'             => $issuance->issued_at
                                             ? \Carbon\Carbon::parse($issuance->issued_at)->format('M d, Y')
@@ -130,15 +124,16 @@ class UniformIssuanceReceivingCopyController extends Controller
             }
         }
 
-        abort_if(empty($slips), 404, 'No slips could be generated.');
+        abort_if(empty($allSlips), 404, 'No recipients with issued items found.');
 
-        $title = 'Bulk Receiving Copy — ' . count($slips) . ' slip(s)';
+        $title = 'Bulk Receiving Copies (' . $issuances->count() . ' issuance(s))';
 
-        return response(
-            UniformIssuanceReceivingCopyService::wrapDocument($slips, $title, $isSalaryDeduct),
-            200,
-            ['Content-Type' => 'text/html; charset=UTF-8']
+        $html = UniformIssuanceReceivingCopyService::wrapDocument(
+            $allSlips,
+            $title,
+            false  // salary-deduct is handled per-slip via is_salary_deduct flag
         );
-    }
 
+        return response($html, 200, ['Content-Type' => 'text/html; charset=UTF-8']);
+    }
 }

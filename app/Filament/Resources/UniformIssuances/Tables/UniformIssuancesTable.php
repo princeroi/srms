@@ -563,13 +563,29 @@ class UniformIssuancesTable
                                 ]);
                             }
 
-                            $newIssuanceItem = $item->replicate(['id', 'created_at', 'updated_at']);
-                            $newIssuanceItem->uniform_item_id         = $toItemId;
-                            $newIssuanceItem->uniform_item_variant_id = $toVariantId;
-                            $newIssuanceItem->quantity                = $replacementQty;
-                            $newIssuanceItem->released_quantity       = $replacementQty;
-                            $newIssuanceItem->remaining_quantity      = 0;
-                            $newIssuanceItem->save();
+                            // ── Upsert: if the same item+variant already exists for this
+                            //    recipient, just add to its quantities instead of inserting
+                            //    a duplicate row. This handles the case where an item was
+                            //    previously changed to X, and is now being changed to X again.
+                            $existingIssuanceItem = \App\Models\UniformIssuanceItems::where([
+                                'uniform_issuance_recipient_id' => $recipient->id,
+                                'uniform_item_id'               => $toItemId,
+                                'uniform_item_variant_id'       => $toVariantId,
+                            ])->first();
+
+                            if ($existingIssuanceItem) {
+                                $existingIssuanceItem->increment('quantity',          $replacementQty);
+                                $existingIssuanceItem->increment('released_quantity', $replacementQty);
+                                // remaining_quantity stays as-is (already fully issued)
+                            } else {
+                                $newIssuanceItem = $item->replicate(['id', 'created_at', 'updated_at']);
+                                $newIssuanceItem->uniform_item_id         = $toItemId;
+                                $newIssuanceItem->uniform_item_variant_id = $toVariantId;
+                                $newIssuanceItem->quantity                = $replacementQty;
+                                $newIssuanceItem->released_quantity       = $replacementQty;
+                                $newIssuanceItem->remaining_quantity      = 0;
+                                $newIssuanceItem->save();
+                            }
 
                             $changeNote[] = [
                                 'label'          => $recipient->employee_name,
@@ -1202,354 +1218,41 @@ class UniformIssuancesTable
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
 
-                    // ─── BULK PRINT: Complete Receiving Copies ─────────────
-                    // Generates one printable page containing the Complete
-                    // Receiving Copy for every selected record that has
-                    // status partial or issued.  Records with other statuses
-                    // are silently skipped and reported in a summary notice.
                     BulkAction::make('bulk_print_receiving_copy')
                         ->label('Print Receiving Copies')
                         ->icon('heroicon-o-printer')
-                        ->color('success')
-                        ->requiresConfirmation()
-                        ->modalHeading('Bulk Print — Complete Receiving Copies')
-                        ->modalDescription('This will open a print-ready page containing the Complete Receiving Copy for every selected issuance that is Partial or Issued. Records with other statuses will be skipped.')
-                        ->modalSubmitActionLabel('Open Print Preview')
+                        ->color('gray')
                         ->deselectRecordsAfterCompletion()
                         ->action(function (Collection $records) {
-                            // ── Filter to only printable records ───────────
-                            $printable = $records->filter(
+                            $eligible = $records->filter(
                                 fn ($r) => in_array($r->uniform_issuance_status, ['partial', 'issued'])
                             );
 
-                            $skipped = $records->count() - $printable->count();
-
-                            if ($printable->isEmpty()) {
+                            if ($eligible->isEmpty()) {
                                 Notification::make()
-                                    ->title('Nothing to Print')
-                                    ->body('None of the selected records are Partial or Issued.')
+                                    ->title('No eligible records')
+                                    ->body('Bulk print only works for partial or issued issuances.')
                                     ->warning()
                                     ->send();
                                 return;
                             }
 
-                            // ── Eager-load all needed relations ────────────
-                            $printable->load([
-                                'site',
-                                'uniformIssuanceType',
-                                'uniformIssuanceRecipient.uniformIssuanceItem.uniformItem',
-                                'uniformIssuanceRecipient.uniformIssuanceItem.uniformItemVariant',
-                            ]);
+                            $ids = $eligible->pluck('id')->implode(',');
+                            $url = route('uniform-issuances.bulk.receiving-copy', ['ids' => $ids]);
 
-                            // ── Build one HTML card per record ─────────────
-                            $cards = '';
-                            foreach ($printable as $record) {
-                                $siteName    = e($record->site->site_name ?? '—');
-                                $typeName    = e($record->uniformIssuanceType->uniform_issuance_type_name ?? '—');
-                                $statusLabel = $record->uniform_issuance_status === 'issued' ? 'FULLY ISSUED' : 'PARTIAL';
-                                $badgeColor  = $record->uniform_issuance_status === 'issued' ? '#16a34a' : '#d97706';
-
-                                // Last relevant log for "last updated" line
-                                $lastLog = \App\Models\UniformIssuanceLog::where('uniform_issuance_id', $record->id)
-                                    ->whereIn('action', ['issued', 'partial', 'item_released', 'item_changed'])
-                                    ->latest()
-                                    ->first();
-
-                                $lastDate = $lastLog
-                                    ? \Carbon\Carbon::parse($lastLog->created_at)->timezone('Asia/Manila')->format('M d, Y h:i A')
-                                    : now()->timezone('Asia/Manila')->format('M d, Y h:i A');
-                                $lastUser = $lastLog?->user?->name ?? 'System';
-
-                                // Item rows
-                                $itemRows = '';
-                                $grandTotal = 0;
-                                foreach ($record->uniformIssuanceRecipient as $recipient) {
-                                    foreach ($recipient->uniformIssuanceItem as $item) {
-                                        $released = (int) $item->released_quantity;
-                                        if ($released <= 0) continue;
-                                        $grandTotal += $released;
-                                        $itemLabel  = e("{$item->uniformItem->uniform_item_name} ({$item->uniformItemVariant->uniform_item_size}) — {$recipient->employee_name}");
-                                        $itemRows  .= "
-                                            <tr>
-                                                <td style='padding:5px 8px;border:1px solid #d1d5db;font-size:11px;color:#111827;'>{$itemLabel}</td>
-                                                <td style='padding:5px 8px;border:1px solid #d1d5db;font-size:11px;text-align:center;font-weight:700;color:#1d4ed8;'>{$released}</td>
-                                            </tr>";
-                                    }
-                                }
-
-                                // Grand total footer
-                                $itemRows .= "
-                                    <tr style='background:#eff6ff;'>
-                                        <td style='padding:5px 8px;border:1px solid #93c5fd;font-size:11px;font-weight:700;text-align:right;color:#374151;'>TOTAL</td>
-                                        <td style='padding:5px 8px;border:1px solid #93c5fd;font-size:12px;font-weight:900;text-align:center;color:#1d4ed8;'>{$grandTotal}</td>
-                                    </tr>";
-
-                                $cards .= "
-                                    <div class='receiving-card'>
-                                        <div class='card-header'>
-                                            <div>
-                                                <div class='card-title'>Complete Receiving Copy</div>
-                                                <div class='card-meta'>{$siteName} &bull; {$typeName}</div>
-                                                <div class='card-sub'>{$lastDate} &bull; by {$lastUser}</div>
-                                            </div>
-                                            <span class='badge' style='background:{$badgeColor};'>{$statusLabel}</span>
-                                        </div>
-                                        <table class='item-table'>
-                                            <thead>
-                                                <tr>
-                                                    <th style='text-align:left;'>Item / Recipient</th>
-                                                    <th style='width:80px;text-align:center;'>Qty</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>{$itemRows}</tbody>
-                                        </table>
-                                        <div class='signature-section'>
-                                            <div class='sig-box'>
-                                                <div class='sig-line'></div>
-                                                <div class='sig-label'>Prepared by</div>
-                                            </div>
-                                            <div class='sig-box'>
-                                                <div class='sig-line'></div>
-                                                <div class='sig-label'>Received by / Date</div>
-                                            </div>
-                                            <div class='sig-box'>
-                                                <div class='sig-line'></div>
-                                                <div class='sig-label'>Noted by</div>
-                                            </div>
-                                        </div>
-                                    </div>";
-                            }
-
-                            // ── Build the complete printable HTML page ─────
-                            $printedAt   = now()->timezone('Asia/Manila')->format('M d, Y h:i A');
-                            $totalCards  = $printable->count();
-                            $skippedNote = $skipped > 0
-                                ? "<div class='skip-notice'>{$skipped} record(s) were skipped (status not partial/issued).</div>"
-                                : '';
-
-                            $html = <<<HTML
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bulk Receiving Copies — {$printedAt}</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            background: #f3f4f6;
-            color: #111827;
-        }
-
-        /* ── Screen toolbar ── */
-        .toolbar {
-            position: fixed;
-            top: 0; left: 0; right: 0;
-            background: #1e3a5f;
-            color: #fff;
-            padding: 10px 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            z-index: 999;
-            box-shadow: 0 2px 8px rgba(0,0,0,.3);
-        }
-        .toolbar-left { font-size: 13px; font-weight: 700; }
-        .toolbar-sub  { font-size: 10px; color: #93c5fd; margin-top: 2px; font-weight: 400; }
-        .btn-print {
-            background: #22c55e;
-            color: #fff;
-            border: none;
-            padding: 8px 20px;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 700;
-            cursor: pointer;
-            letter-spacing: .02em;
-        }
-        .btn-print:hover { background: #16a34a; }
-
-        /* ── Skip notice ── */
-        .skip-notice {
-            background: #fef3c7;
-            border: 1px solid #fbbf24;
-            border-radius: 6px;
-            padding: 8px 14px;
-            font-size: 11px;
-            color: #92400e;
-            margin: 80px 20px 0;
-            font-weight: 600;
-        }
-
-        /* ── Page layout ── */
-        .page-wrapper {
-            padding: 80px 20px 40px;
-            max-width: 900px;
-            margin: 0 auto;
-        }
-
-        /* ── Individual card ── */
-        .receiving-card {
-            background: #fff;
-            border: 2px solid #1e3a5f;
-            border-radius: 10px;
-            padding: 18px;
-            margin-bottom: 28px;
-            box-shadow: 0 2px 8px rgba(0,0,0,.08);
-            page-break-inside: avoid;
-            break-inside: avoid;
-        }
-
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 12px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #e5e7eb;
-        }
-        .card-title { font-size: 15px; font-weight: 800; color: #1e3a5f; }
-        .card-meta  { font-size: 11px; color: #6b7280; margin-top: 3px; }
-        .card-sub   { font-size: 10px; color: #9ca3af; margin-top: 2px; }
-
-        .badge {
-            color: #fff;
-            font-size: 10px;
-            font-weight: 700;
-            padding: 3px 12px;
-            border-radius: 999px;
-            white-space: nowrap;
-            flex-shrink: 0;
-            margin-left: 10px;
-        }
-
-        /* ── Item table ── */
-        .item-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 14px;
-        }
-        .item-table thead tr {
-            background: #1e3a5f;
-        }
-        .item-table thead th {
-            padding: 6px 8px;
-            font-size: 10px;
-            color: #fff;
-            font-weight: 700;
-            border: 1px solid #1e3a5f;
-            text-transform: uppercase;
-            letter-spacing: .04em;
-        }
-        .item-table tbody tr:nth-child(even) { background: #f8fafc; }
-        .item-table tbody td {
-            padding: 5px 8px;
-            border: 1px solid #d1d5db;
-            font-size: 11px;
-        }
-
-        /* ── Signature section ── */
-        .signature-section {
-            display: flex;
-            gap: 16px;
-            margin-top: 16px;
-            padding-top: 12px;
-            border-top: 1px dashed #d1d5db;
-        }
-        .sig-box  { flex: 1; }
-        .sig-line {
-            height: 1px;
-            background: #374151;
-            margin-bottom: 4px;
-        }
-        .sig-label {
-            font-size: 9px;
-            color: #6b7280;
-            text-align: center;
-            text-transform: uppercase;
-            letter-spacing: .05em;
-        }
-
-        /* ── Print overrides ── */
-        @media print {
-            body        { background: #fff; }
-            .toolbar    { display: none !important; }
-            .skip-notice{ margin-top: 0; }
-            .page-wrapper { padding: 20px; max-width: 100%; }
-            .receiving-card {
-                border: 1.5pt solid #1e3a5f;
-                box-shadow: none;
-                margin-bottom: 20px;
-            }
-            @page { margin: 15mm; }
-        }
-    </style>
-</head>
-<body>
-
-<div class="toolbar">
-    <div>
-        <div class="toolbar-left">Bulk Receiving Copies &mdash; {$totalCards} record(s)</div>
-        <div class="toolbar-sub">Printed: {$printedAt}</div>
-    </div>
-    <button class="btn-print" onclick="window.print()">🖨 Print All</button>
-</div>
-
-{$skippedNote}
-
-<div class="page-wrapper">
-    {$cards}
-</div>
-
-<script>
-    // Auto-open print dialog after a short delay so styles are fully applied
-    window.addEventListener('load', function () {
-        setTimeout(function () { window.print(); }, 600);
-    });
-</script>
-
-</body>
-</html>
-HTML;
-
-                            // ── Store HTML in session & redirect to viewer ─
-                            // We use a signed short-lived session key so no
-                            // DB migration is required.  The route just echoes
-                            // the stored HTML.
-                            $key = 'bulk_print_receiving_' . Auth::id();
-                            session([$key => $html]);
-
-                            if ($skipped > 0) {
-                                Notification::make()
-                                    ->title('Print Preview Ready')
-                                    ->body("{$totalCards} record(s) included. {$skipped} skipped (wrong status).")
-                                    ->warning()
-                                    ->persistent()
-                                    ->actions([
-                                        \Filament\Actions\Action::make('open_print')
-                                            ->label('Open Print Preview')
-                                            ->url(route('uniform-issuances.bulk.receiving-copy'))
-                                            ->openUrlInNewTab()
-                                            ->button(),
-                                    ])
-                                    ->send();
-                            } else {
-                                Notification::make()
-                                    ->title('Print Preview Ready')
-                                    ->body("{$totalCards} receiving cop" . ($totalCards === 1 ? 'y' : 'ies') . " ready to print.")
-                                    ->success()
-                                    ->persistent()
-                                    ->actions([
-                                        \Filament\Actions\Action::make('open_print')
-                                            ->label('Open Print Preview')
-                                            ->url(route('uniform-issuances.bulk.receiving-copy'))
-                                            ->openUrlInNewTab()
-                                            ->button(),
-                                    ])
-                                    ->send();
-                            }
+                            Notification::make()
+                                ->title('Print Preview Ready')
+                                ->body("Opening {$eligible->count()} receiving cop(ies) in a new tab.")
+                                ->success()
+                                ->actions([
+                                    \Filament\Actions\Action::make('open')
+                                        ->label('Open Print Page')
+                                        ->url($url)
+                                        ->openUrlInNewTab()
+                                        ->button(),
+                                ])
+                                ->persistent()
+                                ->send();
                         }),
                 ]),
             ]);
