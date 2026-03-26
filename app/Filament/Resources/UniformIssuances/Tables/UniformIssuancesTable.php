@@ -1047,7 +1047,19 @@ class UniformIssuancesTable
                             'uniformIssuanceRecipient.uniformIssuanceItem.uniformItemVariant'
                         );
 
-                        $existingTransmittals = \App\Models\Transmittals::where('uniform_issuance_id', $record->id)
+                        // ── Fetch ALL transmittals for this issuance:
+                        //    1) direct (uniform_issuance_id = this record)
+                        //    2) via pivot (bulk transmittals that included this issuance)
+                        $directIds = \App\Models\Transmittals::where('uniform_issuance_id', $record->id)
+                            ->pluck('id');
+
+                        $pivotIds = \DB::table('transmittal_issuances')
+                            ->where('uniform_issuance_id', $record->id)
+                            ->pluck('transmittal_id');
+
+                        $allTransmittalIds = $directIds->merge($pivotIds)->unique()->values();
+
+                        $existingTransmittals = \App\Models\Transmittals::whereIn('id', $allTransmittalIds)
                             ->latest()
                             ->get();
 
@@ -1060,13 +1072,21 @@ class UniformIssuancesTable
                                 $txnBy   = e($txn->transmitted_by);
                                 $txnDate = \Carbon\Carbon::parse($txn->transmitted_at)->timezone('Asia/Manila')->format('M d, Y');
                                 $txnUrl  = route('uniform-issuances.transmittal', ['issuance' => $record->id, 'transmittal' => $txn->id]);
-                                $status  = $txn->status === 'received' ? 'RECEIVED' : 'PENDING';
+                                $status      = $txn->status === 'received' ? 'RECEIVED' : 'PENDING';
                                 $statusColor = $txn->status === 'received' ? '#16a34a' : '#d97706';
                                 $bg = $i % 2 === 0 ? '#fff' : '#f8fafc';
 
+                                // ── Badge if this was a bulk transmittal ──
+                                $isBulk        = $pivotIds->contains($txn->id);
+                                $bulkBadge     = $isBulk
+                                    ? "<span style='background:#7c3aed;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:999px;margin-left:4px;'>BULK</span>"
+                                    : '';
+
                                 $existingRows .= "
                                     <tr style='background:{$bg};'>
-                                        <td style='padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:11px;font-weight:700;color:#1e3a5f;'>{$txnNo}</td>
+                                        <td style='padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:11px;font-weight:700;color:#1e3a5f;'>
+                                            {$txnNo}{$bulkBadge}
+                                        </td>
                                         <td style='padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#374151;'>{$txnTo}</td>
                                         <td style='padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#374151;'>{$txnBy}</td>
                                         <td style='padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;'>{$txnDate}</td>
@@ -1105,6 +1125,7 @@ class UniformIssuancesTable
                                 </div>";
                         }
 
+                        // ── Items preview (unchanged) ──
                         $previewMap = [];
                         foreach ($record->uniformIssuanceRecipient as $recipient) {
                             foreach ($recipient->uniformIssuanceItem as $item) {
@@ -1194,6 +1215,12 @@ class UniformIssuancesTable
                             'status'              => 'pending',
                         ]);
 
+                        // ── Also save to pivot so modal query is consistent ──
+                        $transmittal->issuances()->attach($record->id);
+
+                        // ── Tag as transmitted ──
+                        $record->update(['is_for_transmit' => true]);
+
                         $url = route('uniform-issuances.transmittal', [
                             'issuance'    => $record->id,
                             'transmittal' => $transmittal->id,
@@ -1247,6 +1274,118 @@ class UniformIssuancesTable
                                 ->actions([
                                     \Filament\Actions\Action::make('open')
                                         ->label('Open Print Page')
+                                        ->url($url)
+                                        ->openUrlInNewTab()
+                                        ->button(),
+                                ])
+                                ->persistent()
+                                ->send();
+                        }),
+                    BulkAction::make('bulk_transmit')
+                        ->label('Create Transmittal')
+                        ->icon('heroicon-o-paper-airplane')
+                        ->color('primary')
+                        ->deselectRecordsAfterCompletion()
+                        ->form([
+                            \Filament\Forms\Components\TextInput::make('transmitted_to')
+                                ->label('Transmitted To')
+                                ->placeholder('e.g. Site Manager / Supervisor name')
+                                ->required(),
+                            \Filament\Forms\Components\TextInput::make('transmitted_by')
+                                ->label('Transmitted By')
+                                ->default(fn () => Auth::user()?->name ?? '')
+                                ->required(),
+                            \Filament\Forms\Components\TextInput::make('purpose')
+                                ->label('Purpose')
+                                ->placeholder('e.g. New hire uniform issuance'),
+                            \Filament\Forms\Components\TextInput::make('instructions')
+                                ->label('Instructions')
+                                ->placeholder('e.g. Please sign and return copy'),
+                        ])
+                        ->action(function (Collection $records, array $data) {
+                            $eligible = $records->filter(
+                                fn ($r) => in_array($r->uniform_issuance_status, ['partial', 'issued'])
+                            );
+
+                            if ($eligible->isEmpty()) {
+                                Notification::make()
+                                    ->title('No eligible records')
+                                    ->body('Bulk transmittal only works for partial or issued issuances.')
+                                    ->warning()
+                                    ->send();
+                                return;
+                            }
+
+                            // ── Merge ALL items from ALL issuances into one summary ──
+                            $summaryMap  = [];
+                            $issuanceIds = [];
+
+                            foreach ($eligible as $issuance) {
+                                $issuance->loadMissing(
+                                    'uniformIssuanceRecipient.uniformIssuanceItem.uniformItem',
+                                    'uniformIssuanceRecipient.uniformIssuanceItem.uniformItemVariant'
+                                );
+
+                                foreach ($issuance->uniformIssuanceRecipient as $recipient) {
+                                    foreach ($recipient->uniformIssuanceItem as $item) {
+                                        $qty = (int) ($item->released_quantity ?: $item->quantity);
+                                        if ($qty <= 0) continue;
+
+                                        $itemName = $item->uniformItem?->uniform_item_name ?? '—';
+                                        $size     = $item->uniformItemVariant?->uniform_item_size ?? '—';
+                                        $key      = $itemName . '||' . $size;
+
+                                        if (!isset($summaryMap[$key])) {
+                                            $summaryMap[$key] = ['item_name' => $itemName, 'size' => $size, 'qty' => 0];
+                                        }
+                                        $summaryMap[$key]['qty'] += $qty;
+                                    }
+                                }
+
+                                $issuanceIds[] = $issuance->id;
+                            }
+
+                            if (empty($summaryMap)) {
+                                Notification::make()
+                                    ->title('Nothing to transmit')
+                                    ->body('No items found in the selected issuances.')
+                                    ->warning()
+                                    ->send();
+                                return;
+                            }
+
+                            // ── Create ONE transmittal ──
+                            $transmittal = \App\Models\Transmittals::create([
+                                'uniform_issuance_id' => $eligible->first()->id,
+                                'transmittal_number'  => \App\Models\Transmittals::generateNumber(),
+                                'transmitted_by'      => $data['transmitted_by'],
+                                'transmitted_to'      => $data['transmitted_to'],
+                                'purpose'             => $data['purpose'] ?? '',
+                                'instructions'        => $data['instructions'] ?? '',
+                                'items_summary'       => array_values($summaryMap),
+                                'transmitted_at'      => now()->toDateString(),
+                                'status'              => 'pending',
+                            ]);
+
+                            // ── Attach all issuances to this transmittal via pivot ──
+                            $transmittal->issuances()->attach($issuanceIds);
+
+                            // ── Tag all eligible issuances as transmitted ──
+                            \App\Models\UniformIssuances::whereIn('id', $issuanceIds)
+                                ->update(['is_for_transmit' => true]);
+
+                            $url = route('uniform-issuances.transmittal', [
+                                'issuance'    => $eligible->first()->id,
+                                'transmittal' => $transmittal->id,
+                            ]);
+
+                            Notification::make()
+                                ->title('Transmittal Created')
+                                ->body("{$transmittal->transmittal_number} — {$eligible->count()} issuance(s) bundled into 1 transmittal.")
+                                ->success()
+                                ->actions([
+                                    \Filament\Actions\Action::make('open')
+                                        ->label('Open Transmittal')
                                         ->url($url)
                                         ->openUrlInNewTab()
                                         ->button(),

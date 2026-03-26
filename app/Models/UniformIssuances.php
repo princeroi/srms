@@ -18,6 +18,7 @@ class UniformIssuances extends Model
         'cancelled_at',
         'signed_receiving_copy',
         'notes',
+        'is_for_transmit'
     ];
 
     protected $casts = [

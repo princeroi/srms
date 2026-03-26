@@ -27,6 +27,17 @@ class Transmittals extends Model
     {
         return $this->belongsTo(UniformIssuances::class, 'uniform_issuance_id');
     }
+
+    public function issuances()
+    {
+        return $this->belongsToMany(
+            \App\Models\UniformIssuances::class,
+            'transmittal_issuances',
+            'transmittal_id',
+            'uniform_issuance_id'
+        );
+    }
+    
  
     /**
      * Auto-generate transmittal number: TXN-YYYYMMDD-XXXX

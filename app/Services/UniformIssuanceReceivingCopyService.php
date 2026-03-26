@@ -49,14 +49,14 @@ class UniformIssuanceReceivingCopyService
         $issuance->loadMissing(
             'site',
             'uniformIssuanceType',
-            'uniformIssuanceRecipient.position'
+            'uniformIssuanceRecipient.position',
+            'uniformIssuanceRecipient.uniformIssuanceItem.uniformItem', // ← add this
+            'uniformIssuanceRecipient.uniformIssuanceItem.uniformItemVariant'
         );
 
         $noteData = json_decode($log->note ?? '[]', true);
         if (!is_array($noteData)) $noteData = [];
 
-        // ── item_changed log: build slips from the _new_item_* fields ──
-        // ── item_released log: treated as a normal release (same format as issued/partial) ──
         if ($log->action === 'item_changed') {
             $byEmployee = [];
             foreach ($noteData as $row) {
@@ -65,14 +65,20 @@ class UniformIssuanceReceivingCopyService
                 $itemSize     = $row['_new_item_size'] ?? '—';
                 $qty          = (int) ($row['released'] ?? 0);
                 if ($qty <= 0) continue;
+
+                // Look up price by item name
+                $price = (float) (\App\Models\UniformItems::where('uniform_item_name', $itemName)
+                    ->value('uniform_item_price') ?? 0);
+
                 $byEmployee[$employeeName][] = [
-                    'name' => $itemName,
-                    'size' => $itemSize,
-                    'qty'  => $qty,
+                    'name'     => $itemName,
+                    'size'     => $itemSize,
+                    'qty'      => $qty,
+                    'price'    => $price,
+                    'subtotal' => $price * $qty,
                 ];
             }
         } else {
-            // ── issued/partial log: parse "Item Name (Size) — Employee Name" ──
             $byEmployee = [];
             foreach ($noteData as $row) {
                 $label    = $row['label'] ?? '—';
@@ -91,10 +97,16 @@ class UniformIssuanceReceivingCopyService
                     $itemSize = '—';
                 }
 
+                // Look up price by item name
+                $price = (float) (\App\Models\UniformItems::where('uniform_item_name', $itemName)
+                    ->value('uniform_item_price') ?? 0);
+
                 $byEmployee[$employeeName][] = [
-                    'name' => $itemName,
-                    'size' => $itemSize,
-                    'qty'  => $released,
+                    'name'     => $itemName,
+                    'size'     => $itemSize,
+                    'qty'      => $released,
+                    'price'    => $price,
+                    'subtotal' => $price * $released,
                 ];
             }
         }
@@ -104,7 +116,6 @@ class UniformIssuanceReceivingCopyService
         $logDate        = \Carbon\Carbon::parse($log->created_at)->timezone('Asia/Manila')->format('M d, Y');
 
         foreach ($byEmployee as $employeeName => $items) {
-            // Match recipient record for position/txn_id metadata
             $rec = $issuance->uniformIssuanceRecipient
                 ->first(fn ($r) => $r->employee_name === $employeeName);
 
@@ -124,8 +135,8 @@ class UniformIssuanceReceivingCopyService
 
         $batchDate = \Carbon\Carbon::parse($log->created_at)->timezone('Asia/Manila')->format('M d, Y h:i A');
         $title     = 'Batch Receiving Copy'
-                   . ($issuance->site ? ' — ' . $issuance->site->site_name : '')
-                   . ' (' . $batchDate . ')';
+                . ($issuance->site ? ' — ' . $issuance->site->site_name : '')
+                . ' (' . $batchDate . ')';
 
         return self::wrapDocument($slips, $title, $isSalaryDeduct);
     }
@@ -138,10 +149,14 @@ class UniformIssuanceReceivingCopyService
             $qty = (int) ($item->released_quantity ?: $item->quantity);
             if ($qty <= 0) continue;
 
+            $price = (float) ($item->uniformItem?->uniform_item_price ?? 0);
+
             $items[] = [
-                'name' => $item->uniformItem?->uniform_item_name ?? "Item #{$item->uniform_item_id}",
-                'size' => $item->uniformItemVariant?->uniform_item_size ?? '—',
-                'qty'  => $qty,
+                'name'     => $item->uniformItem?->uniform_item_name ?? "Item #{$item->uniform_item_id}",
+                'size'     => $item->uniformItemVariant?->uniform_item_size ?? '—',
+                'qty'      => $qty,
+                'price'    => $price,
+                'subtotal' => $price * $qty,
             ];
         }
 
@@ -298,64 +313,73 @@ class UniformIssuanceReceivingCopyService
 
     private static function renderAtd(array $d): string
     {
-        $employee     = e($d['employee']);
-        $site         = e($d['site']);
-        $issuanceType = e($d['issuance_type']);
-        $cn           = e(self::COMPANY_NAME);
-        $cnFull       = e(self::COMPANY_NAME_FULL);
-        $addr         = e(self::COMPANY_ADDRESS);
-        $phone        = e(self::COMPANY_PHONE);
-        $logo         = e(self::COMPANY_LOGO);
+        $employee = e($d['employee']);
+        $site     = e($d['site']);
+        $cn       = e(self::COMPANY_NAME);
+        $cnFull   = e(self::COMPANY_NAME_FULL);
+        $addr     = e(self::COMPANY_ADDRESS);
+        $phone    = e(self::COMPANY_PHONE);
+        $logo     = e(self::COMPANY_LOGO);
 
+        // Compute total and build item descriptions
+        $totalAmount = 0;
+        foreach ($d['items'] as $item) {
+            $qty      = (int) $item['qty'];
+            $price    = (float) ($item['price'] ?? 0);
+            $subtotal = (float) ($item['subtotal'] ?? $price * $qty);
+            $totalAmount += $subtotal;
+        }
+
+        $totalFormatted   = number_format($totalAmount, 2);
         $itemDescriptions = collect($d['items'])->map(fn ($i) =>
             e($i['name']) . ' (' . e($i['size']) . ')'
         )->implode(', ');
 
         return "
-        <div class='slip atd-slip'>
-            <div class='atd-head'>
-                <div class='atd-logo'>
-                    <img src='{$logo}' alt='{$cn}' style='width:100%;height:100%;object-fit:contain;display:block;'>
+            <div class='slip atd-slip'>
+                <div class='atd-head'>
+                    <div class='atd-logo'>
+                        <img src='{$logo}' alt='{$cn}' style='width:100%;height:100%;object-fit:contain;display:block;'>
+                    </div>
+                    <div style='text-align:center;flex:1;'>
+                        <div style='font-size:13px;font-weight:900;color:#1e3a5f;letter-spacing:.05em;text-transform:uppercase;'>{$cn}</div>
+                        <div style='font-size:8px;color:#64748b;margin-top:1px;'>{$addr}</div>
+                        <div style='font-size:8px;color:#64748b;'>Tel: {$phone}</div>
+                    </div>
+                    <div style='width:56px;'></div>
                 </div>
-                <div style='text-align:center;flex:1;'>
-                    <div style='font-size:13px;font-weight:900;color:#1e3a5f;letter-spacing:.05em;text-transform:uppercase;'>{$cn}</div>
-                    <div style='font-size:8px;color:#64748b;margin-top:1px;'>{$addr}</div>
-                    <div style='font-size:8px;color:#64748b;'>Tel: {$phone}</div>
+                <div class='atd-title-wrap'>
+                    <div class='atd-title'>AUTHORITY TO DEDUCT</div>
+                    <div class='atd-underline'></div>
                 </div>
-                <div style='width:56px;'></div>
-            </div>
-            <div class='atd-title-wrap'>
-                <div class='atd-title'>AUTHORITY TO DEDUCT</div>
-                <div class='atd-underline'></div>
-            </div>
-            <div class='atd-body'>
-                <p class='atd-para'>
-                    I,&nbsp;<span class='atd-blank atd-name'>{$employee}</span>,
-                    &nbsp;an employee of <strong>{$cnFull}</strong>, assigned at&nbsp;
-                    <span class='atd-blank atd-site'>{$site}</span>,
-                    &nbsp;DO HEREBY AUTHORIZE SSI to deduct the amount of&nbsp;
-                    <strong>PHP</strong>&nbsp;<span class='atd-blank atd-amount'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>&nbsp;peso,
-                    for the cost of&nbsp;
-                    <span class='atd-blank atd-items'>{$itemDescriptions}</span>
-                    &nbsp;issued to me.
-                </p>
-            </div>
-            <div class='atd-sigs'>
-                <div class='atd-sig'>
-                    <div class='atd-sig-space'></div>
-                    <div class='atd-sig-name'>{$employee}</div>
-                    <div class='atd-sig-line'></div>
-                    <div class='atd-sig-lbl'>Signature Over Printed Name</div>
+                <div class='atd-body'>
+                    <p class='atd-para'>
+                        I,&nbsp;<span class='atd-blank atd-name'>{$employee}</span>,
+                        &nbsp;an employee of <strong>{$cnFull}</strong>, assigned at&nbsp;
+                        <span class='atd-blank atd-site'>{$site}</span>,
+                        &nbsp;DO HEREBY AUTHORIZE SSI to deduct the amount of&nbsp;
+                        <strong>PHP</strong>&nbsp;<span class='atd-blank atd-amount'>&nbsp;{$totalFormatted}&nbsp;</span>&nbsp;peso,
+                        for the cost of&nbsp;
+                        <span class='atd-blank atd-items'>{$itemDescriptions}</span>
+                        &nbsp;issued to me.
+                    </p>
                 </div>
-                <div style='width:48px;flex-shrink:0;'></div>
-                <div class='atd-sig' style='max-width:160px;'>
-                    <div class='atd-sig-space'></div>
-                    <div class='atd-sig-name'>&nbsp;</div>
-                    <div class='atd-sig-line'></div>
-                    <div class='atd-sig-lbl'>Date</div>
+                <div class='atd-sigs'>
+                    <div class='atd-sig'>
+                        <div class='atd-sig-space'></div>
+                        <div class='atd-sig-name'>{$employee}</div>
+                        <div class='atd-sig-line'></div>
+                        <div class='atd-sig-lbl'>Signature Over Printed Name</div>
+                    </div>
+                    <div style='width:48px;flex-shrink:0;'></div>
+                    <div class='atd-sig' style='max-width:160px;'>
+                        <div class='atd-sig-space'></div>
+                        <div class='atd-sig-name'>&nbsp;</div>
+                        <div class='atd-sig-line'></div>
+                        <div class='atd-sig-lbl'>Date</div>
+                    </div>
                 </div>
-            </div>
-        </div>";
+            </div>";
     }
 
     private static function buildPages(array $slips, bool $globalSalaryDeduct = false): string
