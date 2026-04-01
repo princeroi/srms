@@ -45,4 +45,5 @@ class UniformIssuances extends Model
         return $this->hasMany(UniformIssuanceLog::class, 'uniform_issuance_id');
     }
 
+    
 }

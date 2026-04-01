@@ -1,0 +1,221 @@
+@import '../../../vendor/filament/filament/resources/css/theme.css';
+
+@source '../../../app/Filament/**/*';
+@source '../../../../resources/views/filament/**/*';
+
+/* =========================
+   🌊 SOFT BLUE LIGHT THEME (FIXED)
+========================= */
+:root {
+    /* Primary (Filament uses this properly) */
+    --color-primary-50: 235 245 255;
+    --color-primary-100: 210 230 255;
+    --color-primary-200: 180 210 255;
+    --color-primary-300: 140 185 255;
+    --color-primary-400: 100 165 255;
+    --color-primary-500: 59 130 246; /* clean blue */
+    --color-primary-600: 37 99 235;
+    --color-primary-700: 29 78 216;
+    --color-primary-800: 30 64 175;
+    --color-primary-900: 30 58 138;
+
+    /* Backgrounds */
+    --color-bg-main: #f6faff;
+    --color-bg-card: #ffffff;
+    --color-bg-soft: #eef6ff;
+
+    /* Text */
+    --color-text-main: #1e293b;
+    --color-text-muted: #64748b;
+
+    /* Border */
+    --color-border: #e2e8f0;
+}
+
+/* =========================
+   GLOBAL
+========================= */
+body {
+    background: var(--color-bg-main);
+    font-family: 'Inter', sans-serif;
+    color: var(--color-text-main);
+}
+
+/* Typography */
+h1, h2, h3, h4 {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+p {
+    color: var(--color-text-muted);
+}
+
+/* Smooth UI */
+* {
+    transition: all 0.15s ease-in-out;
+}
+
+/* =========================
+   CARDS
+========================= */
+.fi-card {
+    background: var(--color-bg-card);
+    border-radius: 14px;
+    border: 1px solid var(--color-border);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+}
+
+.fi-card:hover {
+    background: var(--color-bg-soft);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.06);
+}
+
+/* =========================
+   BUTTONS
+========================= */
+.fi-btn {
+    border-radius: 8px;
+    font-weight: 500;
+    padding: 0.45rem 0.9rem;
+}
+
+.fi-btn-primary {
+    background: rgb(var(--color-primary-500));
+    color: #fff;
+}
+
+.fi-btn-primary:hover {
+    background: rgb(var(--color-primary-600));
+}
+
+.fi-btn-secondary {
+    background: var(--color-bg-soft);
+    color: rgb(var(--color-primary-600));
+}
+
+.fi-btn-secondary:hover {
+    background: rgb(var(--color-primary-50));
+}
+
+/* =========================
+   TABLES
+========================= */
+.fi-ta {
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+}
+
+.fi-ta-header {
+    background: rgb(var(--color-primary-50));
+    color: var(--color-text-muted);
+    font-weight: 600;
+}
+
+.fi-ta-row {
+    border-bottom: 1px solid #e5edf7;
+}
+
+.fi-ta-row:hover {
+    background: var(--color-bg-soft);
+}
+
+/* =========================
+   SIDEBAR
+========================= */
+.fi-sidebar {
+    background: #ffffff;
+    border-right: 1px solid var(--color-border);
+}
+
+.fi-sidebar-item {
+    border-radius: 8px;
+    margin: 0px 10px;
+    padding: 4px 10px;
+    color: var(--color-text-muted);
+}
+
+.fi-sidebar-item-active {
+    background: rgb(var(--color-primary-100));
+    color: rgb(var(--color-primary-700));
+    font-weight: 500;
+}
+
+.fi-sidebar-item:hover {
+    background: rgb(var(--color-primary-50));
+    color: rgb(var(--color-primary-600));
+}
+
+/* =========================
+   INPUT
+========================= */
+.fi-input {
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+    background: #fff;
+    padding: 0.45rem 0.6rem;
+}
+
+.fi-input:focus {
+    border-color: rgb(var(--color-primary-400));
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+/* =========================
+   MODAL
+========================= */
+.fi-modal {
+    border-radius: 14px;
+}
+
+.fi-modal-header,
+.fi-modal-footer {
+    border-color: var(--color-border);
+}
+
+/* =========================
+   TOPBAR
+========================= */
+.fi-topbar {
+    background: #ffffff;
+    border-bottom: 1px solid var(--color-border);
+}
+
+/* =========================
+   WIDGETS
+========================= */
+.fi-wi-stats-overview-stat {
+    border-radius: 12px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-card);
+}
+
+/* =========================
+   SCROLLBAR
+========================= */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgb(var(--color-primary-200));
+    border-radius: 10px;
+}
+
+/* =========================
+   UX POLISH
+========================= */
+button:hover,
+a:hover {
+    opacity: 0.95;
+}
+
+*:focus {
+    outline: none;
+}
+
+.fi-main {
+    padding: 1.5rem;
+}

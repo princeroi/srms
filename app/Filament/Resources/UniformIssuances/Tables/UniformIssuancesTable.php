@@ -1390,9 +1390,6 @@ class UniformIssuancesTable
                             ->success()
                             ->send();
                     }),
-                
-                
-                // ─── BILLING ──────────────────────────────────────────────────────────────
                 Action::make('billing')
                     ->label('Billing')
                     ->color('warning')
@@ -1402,36 +1399,33 @@ class UniformIssuancesTable
                         if (!in_array($record->uniform_issuance_status, ['partial', 'issued'])) {
                             return false;
                         }
-
+ 
                         $typeName      = strtolower($record->uniformIssuanceType?->uniform_issuance_type_name ?? '');
                         $billableTypes = ['new hire', 'additional', 'annual', 'salary deduct'];
-
+ 
                         $isBillableType = false;
                         foreach ($billableTypes as $t) {
                             if (str_contains($typeName, $t)) { $isBillableType = true; break; }
                         }
-
+ 
                         if (!$isBillableType) return false;
-
+ 
                         $isSalaryDeduct = str_contains($typeName, 'salary deduct');
-
-                        // Reliever-only check — applies to all types
+ 
                         $record->loadMissing('uniformIssuanceRecipient.position');
                         $recipients = $record->uniformIssuanceRecipient;
-
+ 
                         if ($recipients->isNotEmpty()) {
                             $allRelievers = $recipients->every(function ($recipient) {
                                 return strtolower($recipient->position?->position_name ?? '') === 'reliever'
                                     || strtolower($recipient->employee_status ?? '') === 'reliever';
                             });
-
+ 
                             if ($allRelievers) return false;
                         }
-
-                        // Salary deduct: always show (no DR required)
+ 
                         if ($isSalaryDeduct) return true;
-
-                        // Client types (new hire / additional / annual): DR must exist first
+ 
                         return \App\Models\ForDeliveryReceipt::where('uniform_issuance_id', $record->id)->exists();
                     })
                     ->modalSubmitAction(function ($action, $record) {
@@ -1449,11 +1443,11 @@ class UniformIssuancesTable
                             'site',
                             'uniformIssuanceType'
                         );
-
+ 
                         $existingBillings = \App\Models\UniformIssuanceBilling::where('uniform_issuance_id', $record->id)
                             ->latest()
                             ->get();
-
+ 
                         $existingHtml = '';
                         if ($existingBillings->count() > 0) {
                             $rows = '';
@@ -1474,7 +1468,7 @@ class UniformIssuancesTable
                                     'salary_deduct' => '#7c3aed',
                                     default         => '#6b7280',
                                 };
-
+ 
                                 $rows .= "
                                     <tr style='background:{$bg};'>
                                         <td style='padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:11px;font-weight:700;color:#1e3a5f;'>
@@ -1490,14 +1484,14 @@ class UniformIssuancesTable
                                         </td>
                                     </tr>";
                             }
-
+ 
                             $grandTotal = number_format($existingBillings->sum('total_price'), 2);
-
+ 
                             $lockedNotice = "
                                 <div style='padding:8px 12px;background:#fef9c3;border:1px solid #fde68a;border-radius:6px;font-size:11px;color:#92400e;text-align:center;margin-top:12px;'>
                                     A billing has already been created for this issuance. No further billing can be added.
                                 </div>";
-
+ 
                             $existingHtml = "
                                 <div style='margin-bottom:16px;'>
                                     <div style='font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;'>
@@ -1524,26 +1518,25 @@ class UniformIssuancesTable
                                     </table>
                                     {$lockedNotice}
                                 </div>";
-
+ 
                             return new \Illuminate\Support\HtmlString("
                                 <div style='max-height:600px;overflow-y:auto;padding:2px;'>
                                     {$existingHtml}
                                 </div>
                             ");
                         }
-
+ 
                         $siteName = e($record->site?->site_name ?? '—');
                         $typeName = e($record->uniformIssuanceType?->uniform_issuance_type_name ?? '—');
                         $status   = strtoupper($record->uniform_issuance_status);
-
+ 
                         return new \Illuminate\Support\HtmlString("
                             <div style='padding:8px 12px;background:#fefce8;border:1px solid #fde68a;border-radius:6px;font-size:12px;color:#374151;margin-bottom:10px;'>
                                 <strong style='color:#1e3a5f;'>{$siteName}</strong> &bull; {$typeName} &bull;
                                 <span style='color:#1d4ed8;font-weight:700;'>{$status}</span>
                             </div>
                             <div style='font-size:11px;color:#6b7280;'>
-                                The form below will pre-fill billing items based on issued quantities and item prices.
-                                Total is computed automatically.
+                                Fill in the billing details below. Upload required documents per employee.
                             </div>
                         ");
                     })
@@ -1552,7 +1545,7 @@ class UniformIssuancesTable
                         if (\App\Models\UniformIssuanceBilling::where('uniform_issuance_id', $record->id)->exists()) {
                             return [];
                         }
-
+ 
                         $record->load(
                             'uniformIssuanceRecipient.uniformIssuanceItem.uniformItem',
                             'uniformIssuanceRecipient.uniformIssuanceItem.uniformItemVariant',
@@ -1560,30 +1553,36 @@ class UniformIssuancesTable
                             'site',
                             'uniformIssuanceType'
                         );
-
+ 
                         $typeName        = strtolower($record->uniformIssuanceType?->uniform_issuance_type_name ?? '');
                         $isClientBilling = !str_contains($typeName, 'salary deduct');
                         $isSalaryDeduct  = str_contains($typeName, 'salary deduct');
-
+ 
+                        // Determine if we need DR uploads (client billing + posted employees)
+                        $needsDrUpload = $isClientBilling && $record->uniformIssuanceRecipient->contains(
+                            fn ($r) => strtolower($r->employee_status ?? '') === 'posted'
+                        );
+ 
                         $defaultBilledTo = '';
                         if ($isClientBilling) {
                             $defaultBilledTo = $record->site?->client?->client_name
                                 ?? $record->site?->site_name
                                 ?? '';
                         }
-
+ 
                         // ── Build per-employee grouped items ──
-                        $grouped = [];
-
+                        $grouped        = [];   // [ employeeName => [ items ] ]
+                        $recipientMeta  = [];   // [ employeeName => [ status, ... ] ]
+ 
                         foreach ($record->uniformIssuanceRecipient as $recipient) {
                             $isReliever = strtolower($recipient->position?->position_name ?? '') === 'reliever'
                                 || strtolower($recipient->employee_status ?? '') === 'reliever';
-
+ 
                             if ($isClientBilling && $isReliever) continue;
-
+ 
                             $employeeName  = $recipient->employee_name ?? '—';
                             $employeeItems = [];
-
+ 
                             foreach ($recipient->uniformIssuanceItem as $item) {
                                 $qty = (int) $item->released_quantity;
                                 if ($qty <= 0) continue;
@@ -1599,12 +1598,15 @@ class UniformIssuancesTable
                                 }
                                 $employeeItems[$key]['quantity'] += $qty;
                             }
-
+ 
                             if (!empty($employeeItems)) {
-                                $grouped[$employeeName] = array_values($employeeItems);
+                                $grouped[$employeeName]       = array_values($employeeItems);
+                                $recipientMeta[$employeeName] = [
+                                    'employee_status' => strtolower($recipient->employee_status ?? ''),
+                                ];
                             }
                         }
-
+ 
                         // ── Flat list for hidden field ──
                         $billingItemsFlat = [];
                         foreach ($grouped as $empItems) {
@@ -1613,15 +1615,15 @@ class UniformIssuancesTable
                             }
                         }
                         $billingItemsJson = json_encode($billingItemsFlat, JSON_UNESCAPED_UNICODE);
-
+ 
                         $grandTotal = array_sum(array_map(
                             fn ($i) => (float) ($i['unit_price'] ?? 0) * (int) ($i['quantity'] ?? 0),
                             $billingItemsFlat
                         ));
-
+ 
                         $empCount = count($grouped);
                         $fields   = [];
-
+ 
                         // ── Billed To (client only) ──
                         if ($isClientBilling) {
                             $fields[] = \Filament\Forms\Components\TextInput::make('billed_to')
@@ -1629,7 +1631,7 @@ class UniformIssuancesTable
                                 ->default($defaultBilledTo)
                                 ->required()
                                 ->columnSpanFull();
-
+ 
                             $fields[] = \Filament\Forms\Components\Placeholder::make('client_info_note')
                                 ->label('')
                                 ->content(new \Illuminate\Support\HtmlString("
@@ -1638,6 +1640,7 @@ class UniformIssuancesTable
                                         <strong style='color:#1e3a5f;'>Client billing</strong>
                                         — one billing record will be created for the client.
                                         Each employee's items are tracked individually below.
+                                        " . ($needsDrUpload ? "<br><span style='color:#7c3aed;font-size:12px;'>&#9432; <strong>Posted</strong> employees require a signed DR upload + DR number.</span>" : '') . "
                                     </div>
                                 "))
                                 ->columnSpanFull();
@@ -1649,88 +1652,15 @@ class UniformIssuancesTable
                                         border-radius:8px;font-size:13px;color:#374151;'>
                                         <strong style='color:#4c1d95;'>Salary deduct billing</strong>
                                         — one billing record will be created <strong>per employee</strong>.
+                                        <br><span style='color:#7c3aed;font-size:12px;'>&#9432; Each employee requires a <strong>signed ATD image</strong> upload.</span>
                                     </div>
                                 "))
                                 ->columnSpanFull();
                         }
-
+ 
                         $fields[] = \Filament\Forms\Components\Hidden::make('status')->default('pending');
                         $fields[] = \Filament\Forms\Components\Hidden::make('billing_items')->default($billingItemsJson);
-
-                        // ── DR Number + DR Image: client billing + at least one posted employee ──
-                        if ($isClientBilling) {
-                            $hasPostedEmployee = $record->uniformIssuanceRecipient->contains(
-                                fn ($recipient) => strtolower($recipient->employee_status ?? '') === 'posted'
-                            );
-
-                            if ($hasPostedEmployee) {
-                                $fields[] = \Filament\Forms\Components\Placeholder::make('dr_section_divider')
-                                    ->label('')
-                                    ->content(new \Illuminate\Support\HtmlString("
-                                        <div style='border-top:1px dashed #bfdbfe;margin:4px 0 2px;'>
-                                            <div style='display:flex;align-items:center;gap:6px;margin-top:10px;margin-bottom:2px;'>
-                                                <span style='font-size:11px;font-weight:700;color:#1d4ed8;
-                                                    text-transform:uppercase;letter-spacing:.05em;'>
-                                                    Delivery Receipt
-                                                </span>
-                                                <span style='font-size:10px;color:#60a5fa;font-style:italic;'>
-                                                    (Optional — posted employees detected)
-                                                </span>
-                                            </div>
-                                        </div>
-                                    "))
-                                    ->columnSpanFull();
-
-                                $fields[] = \Filament\Forms\Components\TextInput::make('dr_number')
-                                    ->label('DR Number')
-                                    ->placeholder('e.g. DR-2025-001')
-                                    ->columnSpanFull();
-
-                                $fields[] = \Filament\Forms\Components\FileUpload::make('signed_dr')
-                                    ->label('DR Image / File (Optional)')
-                                    ->image()
-                                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
-                                    ->directory('uniform-issuances/dr')
-                                    ->maxSize(5120)
-                                    ->columnSpanFull();
-                            }
-                        }
-
-                        // ── ATD Upload: salary deduct + at least one posted or reliever employee ──
-                        if ($isSalaryDeduct) {
-                            $hasAtdEmployee = $record->uniformIssuanceRecipient->contains(function ($recipient) {
-                                $status = strtolower($recipient->employee_status ?? '');
-                                return in_array($status, ['posted', 'reliever']);
-                            });
-
-                            if ($hasAtdEmployee) {
-                                $fields[] = \Filament\Forms\Components\Placeholder::make('atd_section_divider')
-                                    ->label('')
-                                    ->content(new \Illuminate\Support\HtmlString("
-                                        <div style='border-top:1px dashed #ddd6fe;margin:4px 0 2px;'>
-                                            <div style='display:flex;align-items:center;gap:6px;margin-top:10px;margin-bottom:2px;'>
-                                                <span style='font-size:11px;font-weight:700;color:#7c3aed;
-                                                    text-transform:uppercase;letter-spacing:.05em;'>
-                                                    ATD — Authority to Deduct
-                                                </span>
-                                                <span style='font-size:10px;color:#a78bfa;font-style:italic;'>
-                                                    (posted / reliever employees detected)
-                                                </span>
-                                            </div>
-                                        </div>
-                                    "))
-                                    ->columnSpanFull();
-
-                                $fields[] = \Filament\Forms\Components\FileUpload::make('signed_atd')
-                                    ->label('ATD File / Image (Optional)')
-                                    ->image()
-                                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
-                                    ->directory('uniform-issuances/atd')
-                                    ->maxSize(5120)
-                                    ->columnSpanFull();
-                            }
-                        }
-
+ 
                         // ── Summary header ──
                         $fields[] = \Filament\Forms\Components\Placeholder::make('billing_summary_header')
                             ->label('')
@@ -1748,8 +1678,8 @@ class UniformIssuancesTable
                                 </div>
                             "))
                             ->columnSpanFull();
-
-                        // ── Per-employee cards ──
+ 
+                        // ── Per-employee cards + upload fields ──
                         $avatarStyles = [
                             ['bg' => '#E6F1FB', 'color' => '#0C447C'],
                             ['bg' => '#E1F5EE', 'color' => '#0F6E56'],
@@ -1757,24 +1687,28 @@ class UniformIssuancesTable
                             ['bg' => '#FAEEDA', 'color' => '#633806'],
                             ['bg' => '#FAECE7', 'color' => '#712B13'],
                         ];
-
+ 
                         $empIndex = 0;
                         foreach ($grouped as $employeeName => $empItems) {
                             $empIndex++;
-
+ 
                             $empTotal = array_sum(array_map(
                                 fn ($i) => (float) ($i['unit_price'] ?? 0) * (int) ($i['quantity'] ?? 0),
                                 $empItems
                             ));
-
+ 
                             $words    = explode(' ', trim($employeeName));
                             $initials = strtoupper(
                                 (isset($words[0]) ? substr($words[0], 0, 1) : '') .
                                 (isset($words[1]) ? substr($words[1], 0, 1) : '')
                             );
-
-                            $av = $avatarStyles[($empIndex - 1) % count($avatarStyles)];
-
+ 
+                            $av             = $avatarStyles[($empIndex - 1) % count($avatarStyles)];
+                            $empStatus      = $recipientMeta[$employeeName]['employee_status'] ?? '';
+                            $isPosted       = $empStatus === 'posted';
+                            $needsAtd       = $isSalaryDeduct;
+                            $needsDrForEmp  = $isClientBilling && $isPosted;
+ 
                             $tableRows = '';
                             foreach ($empItems as $item) {
                                 $sub        = (float) ($item['unit_price'] ?? 0) * (int) ($item['quantity'] ?? 0);
@@ -1787,7 +1721,23 @@ class UniformIssuancesTable
                                         <td style='padding:7px 14px;font-size:12px;color:#374151;font-weight:500;text-align:right;'>&#x20B1;" . number_format($sub, 2) . "</td>
                                     </tr>";
                             }
-
+ 
+                            // Status badge for card header
+                            $statusBadgeHtml = '';
+                            if ($empStatus) {
+                                $statusBadgeColor = match($empStatus) {
+                                    'regular'      => '#16a34a',
+                                    'posted'       => '#7c3aed',
+                                    'reliever'     => '#d97706',
+                                    'probationary' => '#2563eb',
+                                    'contractual'  => '#0d9488',
+                                    default        => '#6b7280',
+                                };
+                                $statusBadgeHtml = "<span style='background:{$statusBadgeColor};color:#fff;font-size:9px;
+                                    font-weight:700;padding:2px 8px;border-radius:999px;margin-left:6px;'>"
+                                    . strtoupper($empStatus) . "</span>";
+                            }
+ 
                             $cardHtml = "
                                 <div style='background:#fff;border:0.5px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:4px;'>
                                     <div style='display:flex;align-items:center;gap:10px;padding:10px 14px;
@@ -1798,7 +1748,9 @@ class UniformIssuancesTable
                                             {$initials}
                                         </div>
                                         <div>
-                                            <div style='font-size:14px;font-weight:500;color:#111827;'>" . e($employeeName) . "</div>
+                                            <div style='font-size:14px;font-weight:500;color:#111827;display:flex;align-items:center;'>
+                                                " . e($employeeName) . "{$statusBadgeHtml}
+                                            </div>
                                             <div style='font-size:11px;color:#6b7280;margin-top:1px;'>Employee #{$empIndex}</div>
                                         </div>
                                         <span style='margin-left:auto;background:{$av['bg']};color:{$av['color']};
@@ -1829,12 +1781,91 @@ class UniformIssuancesTable
                                         </table>
                                     </div>
                                 </div>";
-
+ 
                             $fields[] = \Filament\Forms\Components\Placeholder::make('emp_card_' . $empIndex)
                                 ->label('')
                                 ->content(new \Illuminate\Support\HtmlString($cardHtml))
                                 ->columnSpanFull();
-
+ 
+                            // ── ATD upload section (salary deduct) ──
+                            if ($needsAtd) {
+                                $safeKey = 'emp_' . $empIndex;
+ 
+                                $fields[] = \Filament\Forms\Components\Placeholder::make("atd_header_{$safeKey}")
+                                    ->label('')
+                                    ->content(new \Illuminate\Support\HtmlString("
+                                        <div style='display:flex;align-items:center;gap:8px;padding:6px 0 4px;'>
+                                            <span style='width:6px;height:6px;border-radius:50%;background:#7c3aed;display:inline-block;'></span>
+                                            <span style='font-size:11px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:.05em;'>
+                                                Signed ATD — " . e($employeeName) . "
+                                            </span>
+                                            <span style='font-size:10px;color:#9ca3af;'>(required)</span>
+                                        </div>
+                                    "))
+                                    ->columnSpanFull();
+ 
+                                $fields[] = \Filament\Forms\Components\FileUpload::make("atd_image_{$safeKey}")
+                                    ->label('ATD Image')
+                                    ->helperText('Upload the signed Acknowledgement/ATD document for ' . $employeeName)
+                                    ->image()
+                                    ->imagePreviewHeight('120')
+                                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
+                                    ->directory('billing-atd')
+                                    ->required()
+                                    ->columnSpanFull();
+ 
+                                $fields[] = \Filament\Forms\Components\DatePicker::make("atd_date_signed_{$safeKey}")
+                                    ->label('Date Signed')
+                                    ->default(now()->toDateString())
+                                    ->required();
+ 
+                                $fields[] = \Filament\Forms\Components\TextInput::make("atd_remarks_{$safeKey}")
+                                    ->label('Remarks')
+                                    ->placeholder('Optional notes');
+                            }
+ 
+                            // ── DR upload section (client billing, posted employee) ──
+                            if ($needsDrForEmp) {
+                                $safeKey = 'emp_' . $empIndex;
+ 
+                                $fields[] = \Filament\Forms\Components\Placeholder::make("dr_header_{$safeKey}")
+                                    ->label('')
+                                    ->content(new \Illuminate\Support\HtmlString("
+                                        <div style='display:flex;align-items:center;gap:8px;padding:6px 0 4px;'>
+                                            <span style='width:6px;height:6px;border-radius:50%;background:#7c3aed;display:inline-block;'></span>
+                                            <span style='font-size:11px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:.05em;'>
+                                                Signed DR — " . e($employeeName) . "
+                                            </span>
+                                            <span style='font-size:10px;color:#9ca3af;'>(posted employee — required)</span>
+                                        </div>
+                                    "))
+                                    ->columnSpanFull();
+ 
+                                $fields[] = \Filament\Forms\Components\TextInput::make("dr_number_{$safeKey}")
+                                    ->label('DR Number')
+                                    ->placeholder('e.g. DR-2024-001')
+                                    ->required();
+ 
+                                $fields[] = \Filament\Forms\Components\FileUpload::make("dr_image_{$safeKey}")
+                                    ->label('Signed DR Image')
+                                    ->helperText('Upload the signed Delivery Receipt for ' . $employeeName)
+                                    ->image()
+                                    ->imagePreviewHeight('120')
+                                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
+                                    ->directory('billing-dr')
+                                    ->required()
+                                    ->columnSpanFull();
+ 
+                                $fields[] = \Filament\Forms\Components\DatePicker::make("dr_date_signed_{$safeKey}")
+                                    ->label('Date Signed')
+                                    ->default(now()->toDateString())
+                                    ->required();
+ 
+                                $fields[] = \Filament\Forms\Components\TextInput::make("dr_remarks_{$safeKey}")
+                                    ->label('Remarks')
+                                    ->placeholder('Optional notes');
+                            }
+ 
                             if ($empIndex < $empCount) {
                                 $fields[] = \Filament\Forms\Components\Placeholder::make('emp_divider_' . $empIndex)
                                     ->label('')
@@ -1844,7 +1875,7 @@ class UniformIssuancesTable
                                     ->columnSpanFull();
                             }
                         }
-
+ 
                         return $fields;
                     })
                     ->action(function ($record, array $data, Action $action) {
@@ -1852,19 +1883,20 @@ class UniformIssuancesTable
                         if (\App\Models\UniformIssuanceBilling::where('uniform_issuance_id', $record->id)->exists()) {
                             return;
                         }
-
+ 
                         $record->load(
                             'uniformIssuanceRecipient.uniformIssuanceItem.uniformItem',
                             'uniformIssuanceRecipient.uniformIssuanceItem.uniformItemVariant',
+                            'uniformIssuanceRecipient.position',
                             'uniformIssuanceType'
                         );
-
+ 
                         $typeName        = strtolower($record->uniformIssuanceType?->uniform_issuance_type_name ?? '');
                         $isClientBilling = !str_contains($typeName, 'salary deduct');
                         $isSalaryDeduct  = str_contains($typeName, 'salary deduct');
-
+ 
                         $billingItems = json_decode($data['billing_items'] ?? '[]', true);
-
+ 
                         if (!is_array($billingItems) || empty($billingItems)) {
                             \Filament\Notifications\Notification::make()
                                 ->title('No billing items')
@@ -1874,22 +1906,40 @@ class UniformIssuancesTable
                             $action->halt();
                             return;
                         }
-
+ 
                         $computeTotal = fn (array $items) => array_sum(
                             array_map(fn ($i) => (float) ($i['unit_price'] ?? 0) * (int) ($i['quantity'] ?? 0), $items)
                         );
-
+ 
                         // ── Re-group items by employee ──
-                        $grouped = [];
+                        $grouped        = [];
+                        $recipientMeta  = [];
+ 
                         foreach ($billingItems as $item) {
                             $emp = $item['employee'] ?? '—';
                             $grouped[$emp][] = $item;
                         }
-
+ 
+                        // Re-build employee status map from recipients
+                        foreach ($record->uniformIssuanceRecipient as $recipient) {
+                            $name = $recipient->employee_name ?? '—';
+                            $recipientMeta[$name] = [
+                                'employee_status' => strtolower($recipient->employee_status ?? ''),
+                            ];
+                        }
+ 
+                        // ── Build safe key index — must match the form ──
+                        $empIndexMap = [];
+                        $idx = 0;
+                        foreach ($grouped as $empName => $items) {
+                            $idx++;
+                            $empIndexMap[$empName] = $idx;
+                        }
+ 
                         if ($isClientBilling) {
                             $total = $computeTotal($billingItems);
-
-                            \App\Models\UniformIssuanceBilling::create([
+ 
+                            $billing = \App\Models\UniformIssuanceBilling::create([
                                 'uniform_issuance_id'   => $record->id,
                                 'billed_to'             => $data['billed_to'] ?? $record->site?->site_name ?? '—',
                                 'billing_type'          => 'client',
@@ -1900,24 +1950,46 @@ class UniformIssuancesTable
                                 'billed_at'             => null,
                                 'created_by'            => \Illuminate\Support\Facades\Auth::id(),
                                 'signed_receiving_copy' => null,
-                                'signed_atd'            => null,
-                                'signed_dr'             => $data['signed_dr'] ?? null,
-                                'dr_number'             => $data['dr_number'] ?? null,
                             ]);
-
+ 
+                            // ── Save DR records for posted employees ──
+                            foreach ($grouped as $empName => $items) {
+                                $empStatus = $recipientMeta[$empName]['employee_status'] ?? '';
+                                $safeKey   = 'emp_' . ($empIndexMap[$empName] ?? 0);
+ 
+                                if ($empStatus === 'posted') {
+                                    $drImage    = $data["dr_image_{$safeKey}"]    ?? null;
+                                    $drNumber   = $data["dr_number_{$safeKey}"]   ?? null;
+                                    $drDate     = $data["dr_date_signed_{$safeKey}"] ?? null;
+                                    $drRemarks  = $data["dr_remarks_{$safeKey}"]  ?? null;
+ 
+                                    \App\Models\BillingDr::create([
+                                        'uniform_issuance_id'          => $record->id,
+                                        'uniform_issuance_billing_id'  => $billing->id,
+                                        'employee_name'                => $empName,
+                                        'dr_number'                    => $drNumber ?? '—',
+                                        'date_signed'                  => $drDate,
+                                        'dr_image'                     => $drImage,
+                                        'remarks'                      => $drRemarks,
+                                        'uploaded_by'                  => \Illuminate\Support\Facades\Auth::id(),
+                                    ]);
+                                }
+                            }
+ 
                             \Filament\Notifications\Notification::make()
                                 ->title('Billing Created')
                                 ->body('Client billing of ₱' . number_format($total, 2) . ' saved successfully.')
                                 ->success()
                                 ->send();
-
+ 
                         } elseif ($isSalaryDeduct) {
                             $count = 0;
-
+ 
                             foreach ($grouped as $employeeName => $items) {
-                                $total = $computeTotal($items);
-
-                                \App\Models\UniformIssuanceBilling::create([
+                                $total   = $computeTotal($items);
+                                $safeKey = 'emp_' . ($empIndexMap[$employeeName] ?? 0);
+ 
+                                $billing = \App\Models\UniformIssuanceBilling::create([
                                     'uniform_issuance_id'   => $record->id,
                                     'billed_to'             => $employeeName,
                                     'billing_type'          => 'salary_deduct',
@@ -1928,23 +2000,42 @@ class UniformIssuancesTable
                                     'billed_at'             => null,
                                     'created_by'            => \Illuminate\Support\Facades\Auth::id(),
                                     'signed_receiving_copy' => null,
-                                    'signed_atd'            => $data['signed_atd'] ?? null,
-                                    'signed_dr'             => null,
-                                    'dr_number'             => null,
                                 ]);
 
+                                $index = $count + 1;
+ 
+                                // ── Save ATD record per employee ──
+                                $atdImage   = $data["atd_image_emp_{$index}"]      ?? $data["atd_image_{$safeKey}"]      ?? null;
+                                $atdDate    = $data["atd_date_signed_emp_{$index}"] ?? $data["atd_date_signed_{$safeKey}"] ?? null;
+                                $atdRemarks = $data["atd_remarks_emp_{$index}"]    ?? $data["atd_remarks_{$safeKey}"]    ?? null;
+ 
+                                // Use the correct safeKey derived from empIndexMap
+                                $atdImage   = $data["atd_image_{$safeKey}"]      ?? null;
+                                $atdDate    = $data["atd_date_signed_{$safeKey}"] ?? null;
+                                $atdRemarks = $data["atd_remarks_{$safeKey}"]    ?? null;
+ 
+                                \App\Models\BillingAtd::create([
+                                    'uniform_issuance_id'          => $record->id,
+                                    'uniform_issuance_billing_id'  => $billing->id,
+                                    'employee_name'                => $employeeName,
+                                    'date_signed'                  => $atdDate,
+                                    'atd_image'                    => $atdImage,
+                                    'remarks'                      => $atdRemarks,
+                                    'uploaded_by'                  => \Illuminate\Support\Facades\Auth::id(),
+                                ]);
+ 
                                 $count++;
                             }
-
+ 
                             \Filament\Notifications\Notification::make()
                                 ->title('Billings Created')
                                 ->body("{$count} salary deduct billing(s) created successfully.")
                                 ->success()
                                 ->send();
-
+ 
                         } else {
                             $total = $computeTotal($billingItems);
-
+ 
                             \App\Models\UniformIssuanceBilling::create([
                                 'uniform_issuance_id'   => $record->id,
                                 'billed_to'             => $data['billed_to'] ?? '—',
@@ -1956,11 +2047,8 @@ class UniformIssuancesTable
                                 'billed_at'             => null,
                                 'created_by'            => \Illuminate\Support\Facades\Auth::id(),
                                 'signed_receiving_copy' => null,
-                                'signed_atd'            => null,
-                                'signed_dr'             => null,
-                                'dr_number'             => null,
                             ]);
-
+ 
                             \Filament\Notifications\Notification::make()
                                 ->title('Billing Saved')
                                 ->success()
