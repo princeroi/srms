@@ -13,7 +13,10 @@ class ListUniformCategories extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make(),
+            CreateAction::make()
+                ->extraAttributes([
+                    'style' => 'color: #ffffff;' // dark text
+                ]),
         ];
     }
 }

@@ -27,7 +27,10 @@ class ListUniformIssuances extends ListRecords
                         'status_to'           => $record->uniform_issuance_status,
                         'note'                => 'Issuance was created.',
                     ]);
-                }),
+                })
+                ->extraAttributes([
+                    'style' => 'color: #ffffff;' // dark text
+                ]),
         ];
     }
 }

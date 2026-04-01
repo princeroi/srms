@@ -41,8 +41,6 @@ class UniformIssuanceBillingResource extends Resource
     {
         return [
             'index' => ListUniformIssuanceBillings::route('/'),
-            'create' => CreateUniformIssuanceBilling::route('/create'),
-            'edit' => EditUniformIssuanceBilling::route('/{record}/edit'),
         ];
     }
 }

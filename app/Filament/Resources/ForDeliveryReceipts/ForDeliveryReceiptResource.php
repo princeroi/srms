@@ -41,8 +41,6 @@ class ForDeliveryReceiptResource extends Resource
     {
         return [
             'index' => ListForDeliveryReceipts::route('/'),
-            'create' => CreateForDeliveryReceipt::route('/create'),
-            'edit' => EditForDeliveryReceipt::route('/{record}/edit'),
         ];
     }
 }

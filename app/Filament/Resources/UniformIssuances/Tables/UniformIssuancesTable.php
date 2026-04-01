@@ -1054,7 +1054,6 @@ class UniformIssuancesTable
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Close'),
 
-                // ─── FOR DELIVERY RECEIPT ──────────────────────────────────────────────────
                 Action::make('for_delivery_receipt')
                     ->label('For Delivery Receipt')
                     ->color('success')
@@ -1102,8 +1101,6 @@ class UniformIssuancesTable
                             ->latest()
                             ->first();
                 
-                        $existingHtml = '';
-                
                         if ($existingDR) {
                             $statusColor = match ($existingDR->status) {
                                 'done'      => '#16a34a',
@@ -1125,46 +1122,66 @@ class UniformIssuancesTable
                                 $emp      = e($row['employee'] ?? '—');
                                 $qty      = (int) ($row['qty'] ?? 0);
                                 $itemRows .= "
-                                    <tr style='border-bottom:0.5px solid #f1f5f9;'>
-                                        <td style='padding:7px 14px;font-size:12px;color:#111827;'>{$emp}</td>
-                                        <td style='padding:7px 14px;font-size:12px;color:#374151;'>{$itemName}</td>
-                                        <td style='padding:7px 14px;font-size:12px;color:#374151;text-align:center;'>{$size}</td>
-                                        <td style='padding:7px 14px;font-size:12px;color:#185FA5;font-weight:600;text-align:center;'>{$qty}</td>
+                                    <tr>
+                                        <td style='padding:9px 16px;font-size:12.5px;color:#111827;border-bottom:1px solid #f1f5f9;'>{$emp}</td>
+                                        <td style='padding:9px 16px;font-size:12.5px;color:#374151;border-bottom:1px solid #f1f5f9;'>{$itemName}</td>
+                                        <td style='padding:9px 16px;font-size:12.5px;color:#374151;text-align:center;border-bottom:1px solid #f1f5f9;'>{$size}</td>
+                                        <td style='padding:9px 16px;font-size:12.5px;color:#1d4ed8;font-weight:600;text-align:center;border-bottom:1px solid #f1f5f9;'>{$qty}</td>
                                     </tr>";
                             }
                 
                             $existingHtml = "
-                                <div style='border:2px solid #bbf7d0;border-radius:8px;padding:16px;margin-bottom:16px;background:#f0fdf4;box-shadow:0 2px 6px rgba(0,0,0,.06);'>
-                                    <div style='display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;'>
-                                        <div>
-                                            <div style='font-size:14px;font-weight:800;color:#1e3a5f;'>Delivery Receipt #DR{$existingDR->id}</div>
-                                            <div style='font-size:11px;color:#6b7280;margin-top:3px;'>Endorsed by: <strong>{$endorseBy}</strong> &bull; {$endorseDate}</div>
-                                            <div style='font-size:10px;color:#9ca3af;margin-top:1px;'>Created: {$createdAt}</div>
-                                            <div style='font-size:11px;color:#374151;margin-top:4px;'>Remarks: {$remarks}</div>
+                                <div style='font-family:\"DM Sans\",system-ui,sans-serif;'>
+                
+                                    <!-- DR Record Card -->
+                                    <div style='border:1.5px solid #bbf7d0;border-radius:12px;overflow:hidden;margin-bottom:12px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.05);'>
+                
+                                        <!-- Card Header -->
+                                        <div style='background:linear-gradient(135deg,#f0fdf4 0%,#dcfce7 100%);padding:14px 18px;border-bottom:1px solid #bbf7d0;display:flex;justify-content:space-between;align-items:flex-start;'>
+                                            <div>
+                                                <div style='font-size:13px;font-weight:700;color:#14532d;letter-spacing:-0.02em;'>
+                                                    Delivery Receipt &nbsp;#DR{$existingDR->id}
+                                                </div>
+                                                <div style='font-size:11.5px;color:#4b7a5c;margin-top:4px;line-height:1.5;'>
+                                                    Endorsed by <strong style='color:#14532d;'>{$endorseBy}</strong>
+                                                    &nbsp;&bull;&nbsp; {$endorseDate}
+                                                </div>
+                                                <div style='font-size:11px;color:#6b7280;margin-top:3px;'>Created {$createdAt}</div>
+                                                <div style='font-size:11.5px;color:#374151;margin-top:5px;'>
+                                                    <span style='color:#6b7280;'>Remarks:</span> {$remarks}
+                                                </div>
+                                            </div>
+                                            <span style='background:{$statusColor};color:#fff;font-size:10px;font-weight:700;
+                                                padding:4px 12px;border-radius:999px;letter-spacing:.04em;white-space:nowrap;flex-shrink:0;margin-top:2px;'>
+                                                {$statusLabel}
+                                            </span>
                                         </div>
-                                        <span style='background:{$statusColor};color:#fff;font-size:10px;font-weight:700;padding:3px 10px;border-radius:999px;white-space:nowrap;'>{$statusLabel}</span>
+                
+                                        <!-- Items Table -->
+                                        <div style='overflow-x:auto;'>
+                                            <table style='width:100%;border-collapse:collapse;'>
+                                                <thead>
+                                                    <tr style='background:#1e3a5f;'>
+                                                        <th style='padding:9px 16px;text-align:left;font-size:10.5px;font-weight:600;color:#e0f2fe;text-transform:uppercase;letter-spacing:.07em;'>Employee</th>
+                                                        <th style='padding:9px 16px;text-align:left;font-size:10.5px;font-weight:600;color:#e0f2fe;text-transform:uppercase;letter-spacing:.07em;'>Item</th>
+                                                        <th style='padding:9px 16px;text-align:center;font-size:10.5px;font-weight:600;color:#e0f2fe;text-transform:uppercase;letter-spacing:.07em;width:80px;'>Size</th>
+                                                        <th style='padding:9px 16px;text-align:center;font-size:10.5px;font-weight:600;color:#e0f2fe;text-transform:uppercase;letter-spacing:.07em;width:70px;'>Qty</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>{$itemRows}</tbody>
+                                            </table>
+                                        </div>
                                     </div>
-                                    <table style='width:100%;border-collapse:collapse;'>
-                                        <thead>
-                                            <tr style='background:#1e3a5f;'>
-                                                <th style='padding:6px 14px;text-align:left;font-size:10px;color:#fff;text-transform:uppercase;letter-spacing:.05em;'>Employee</th>
-                                                <th style='padding:6px 14px;text-align:left;font-size:10px;color:#fff;text-transform:uppercase;letter-spacing:.05em;'>Item</th>
-                                                <th style='padding:6px 14px;text-align:center;font-size:10px;color:#fff;text-transform:uppercase;letter-spacing:.05em;width:70px;'>Size</th>
-                                                <th style='padding:6px 14px;text-align:center;font-size:10px;color:#fff;text-transform:uppercase;letter-spacing:.05em;width:60px;'>Qty</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>{$itemRows}</tbody>
-                                    </table>
-                                </div>
-                                <div style='padding:8px 12px;background:#fef9c3;border:1px solid #fde68a;border-radius:6px;font-size:11px;color:#92400e;text-align:center;'>
-                                    A delivery receipt has already been created for this issuance. No further DR can be added.
+                
+                                    <!-- Locked Notice -->
+                                    <div style='padding:10px 14px;background:#fef9c3;border:1px solid #fde68a;border-radius:8px;
+                                        font-size:12px;color:#854d0e;text-align:center;font-weight:500;'>
+                                        &#9432;&nbsp; A delivery receipt already exists for this issuance. No additional DR can be created.
+                                    </div>
+                
                                 </div>";
                 
-                            return new \Illuminate\Support\HtmlString("
-                                <div style='max-height:600px;overflow-y:auto;padding:2px;'>
-                                    {$existingHtml}
-                                </div>
-                            ");
+                            return new \Illuminate\Support\HtmlString($existingHtml);
                         }
                 
                         $siteName = e($record->site?->site_name ?? '—');
@@ -1172,13 +1189,20 @@ class UniformIssuancesTable
                         $status   = strtoupper($record->uniform_issuance_status);
                 
                         return new \Illuminate\Support\HtmlString("
-                            <div style='padding:8px 12px;background:#fefce8;border:1px solid #fde68a;border-radius:6px;font-size:12px;color:#374151;margin-bottom:10px;'>
-                                <strong style='color:#1e3a5f;'>{$siteName}</strong> &bull; {$typeName} &bull;
-                                <span style='color:#16a34a;font-weight:700;'>{$status}</span>
-                            </div>
-                            <div style='font-size:11px;color:#6b7280;'>
-                                The form below will pre-fill item summary based on issued quantities.
-                                Only non-reliever employees are included.
+                            <div style='font-family:\"DM Sans\",system-ui,sans-serif;'>
+                                <div style='display:flex;align-items:center;gap:10px;padding:10px 14px;
+                                    background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:12px;'>
+                                    <div style='width:8px;height:8px;border-radius:50%;background:#16a34a;flex-shrink:0;'></div>
+                                    <span style='font-size:13px;font-weight:600;color:#1e3a5f;'>{$siteName}</span>
+                                    <span style='color:#d1d5db;'>·</span>
+                                    <span style='font-size:12.5px;color:#374151;'>{$typeName}</span>
+                                    <span style='margin-left:auto;font-size:11px;font-weight:700;color:#16a34a;
+                                        background:#dcfce7;padding:3px 10px;border-radius:999px;letter-spacing:.03em;'>{$status}</span>
+                                </div>
+                                <div style='font-size:12px;color:#6b7280;line-height:1.6;'>
+                                    The form below pre-fills item quantities based on what has been issued.
+                                    Only non-reliever employees are included.
+                                </div>
                             </div>
                         ");
                     })
@@ -1238,6 +1262,7 @@ class UniformIssuancesTable
                 
                         $fields = [];
                 
+                        // ── Meta fields ──
                         $fields[] = \Filament\Forms\Components\TextInput::make('endorse_by')
                             ->label('Endorsed By')
                             ->default(fn () => \Illuminate\Support\Facades\Auth::user()?->name ?? '')
@@ -1256,17 +1281,18 @@ class UniformIssuancesTable
                         $fields[] = \Filament\Forms\Components\Hidden::make('item_summary')
                             ->default($itemSummaryJson);
                 
+                        // ── Summary strip ──
                         $fields[] = \Filament\Forms\Components\Placeholder::make('dr_summary_header')
                             ->label('')
                             ->content(new \Illuminate\Support\HtmlString("
-                                <div style='display:flex;align-items:center;justify-content:space-between;
-                                    padding:8px 0 6px;border-bottom:0.5px solid #e5e7eb;margin-bottom:4px;'>
-                                    <span style='font-size:11px;font-weight:500;color:#6b7280;
-                                        text-transform:uppercase;letter-spacing:.06em;'>
-                                        {$empCount} employee" . ($empCount !== 1 ? 's' : '') . " &nbsp;&middot;&nbsp; items
+                                <div style='font-family:\"DM Sans\",system-ui,sans-serif;
+                                    display:flex;align-items:center;justify-content:space-between;
+                                    padding:10px 0 8px;border-bottom:1.5px solid #e5e7eb;margin-top:4px;'>
+                                    <span style='font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.08em;'>
+                                        {$empCount}&nbsp;employee" . ($empCount !== 1 ? 's' : '') . "
                                     </span>
-                                    <span style='font-size:15px;font-weight:500;color:#16a34a;'>
-                                        Total qty: {$grandQty}
+                                    <span style='font-size:14px;font-weight:700;color:#16a34a;letter-spacing:-0.02em;'>
+                                        {$grandQty}&nbsp;<span style='font-size:11px;font-weight:500;color:#6b7280;'>total pcs</span>
                                     </span>
                                 </div>
                             "))
@@ -1294,45 +1320,72 @@ class UniformIssuancesTable
                             $tableRows = '';
                             foreach ($empItems as $item) {
                                 $tableRows .= "
-                                    <tr style='border-bottom:0.5px solid #f1f5f9;'>
-                                        <td style='padding:7px 14px;font-size:12px;color:#111827;'>" . e($item['item_name']) . "</td>
-                                        <td style='padding:7px 14px;font-size:12px;color:#374151;text-align:center;'>" . e($item['size']) . "</td>
-                                        <td style='padding:7px 14px;font-size:12px;color:#185FA5;font-weight:500;text-align:center;'>" . (int) $item['qty'] . "</td>
+                                    <tr>
+                                        <td style='padding:9px 16px;font-size:12.5px;color:#111827;border-bottom:1px solid #f1f5f9;'>
+                                            " . e($item['item_name']) . "
+                                        </td>
+                                        <td style='padding:9px 16px;font-size:12.5px;color:#374151;text-align:center;border-bottom:1px solid #f1f5f9;'>
+                                            " . e($item['size']) . "
+                                        </td>
+                                        <td style='padding:9px 16px;font-size:12.5px;font-weight:600;color:#1d4ed8;text-align:center;border-bottom:1px solid #f1f5f9;'>
+                                            " . (int) $item['qty'] . "
+                                        </td>
                                     </tr>";
                             }
                 
                             $cardHtml = "
-                                <div style='background:#fff;border:0.5px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:4px;'>
-                                    <div style='display:flex;align-items:center;gap:10px;padding:10px 14px;
-                                        background:#f8fafc;border-bottom:0.5px solid #e2e8f0;'>
-                                        <div style='width:34px;height:34px;border-radius:50%;background:{$av['bg']};
+                                <div style='font-family:\"DM Sans\",system-ui,sans-serif;
+                                    border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;
+                                    box-shadow:0 1px 4px rgba(0,0,0,.05);margin-bottom:2px;'>
+                
+                                    <!-- Employee header -->
+                                    <div style='display:flex;align-items:center;gap:12px;
+                                        padding:12px 16px;background:#f8fafc;border-bottom:1px solid #e2e8f0;'>
+                                        <div style='width:36px;height:36px;border-radius:50%;background:{$av['bg']};flex-shrink:0;
                                             display:flex;align-items:center;justify-content:center;
-                                            font-size:12px;font-weight:600;color:{$av['color']};flex-shrink:0;'>
+                                            font-size:12.5px;font-weight:700;color:{$av['color']};letter-spacing:.02em;'>
                                             {$initials}
                                         </div>
-                                        <div>
-                                            <div style='font-size:14px;font-weight:500;color:#111827;'>" . e($employeeName) . "</div>
-                                            <div style='font-size:11px;color:#6b7280;margin-top:1px;'>Employee #{$empIndex}</div>
+                                        <div style='flex:1;min-width:0;'>
+                                            <div style='font-size:13.5px;font-weight:600;color:#111827;
+                                                letter-spacing:-0.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>
+                                                " . e($employeeName) . "
+                                            </div>
+                                            <div style='font-size:11px;color:#9ca3af;margin-top:1px;'>
+                                                Employee #{$empIndex}
+                                            </div>
                                         </div>
-                                        <span style='margin-left:auto;background:{$av['bg']};color:{$av['color']};
-                                            font-size:12px;font-weight:600;padding:3px 12px;border-radius:999px;white-space:nowrap;'>
-                                            {$empQty} pc" . ($empQty !== 1 ? 's' : '') . "
-                                        </span>
+                                        <div style='background:{$av['bg']};color:{$av['color']};
+                                            font-size:12.5px;font-weight:700;padding:4px 14px;
+                                            border-radius:999px;white-space:nowrap;flex-shrink:0;letter-spacing:-.01em;'>
+                                            {$empQty}&nbsp;pc" . ($empQty !== 1 ? 's' : '') . "
+                                        </div>
                                     </div>
+                
+                                    <!-- Items table -->
                                     <div style='overflow-x:auto;'>
-                                        <table style='width:100%;border-collapse:collapse;min-width:320px;'>
+                                        <table style='width:100%;border-collapse:collapse;min-width:300px;'>
                                             <thead>
-                                                <tr style='background:#f8fafc;border-bottom:0.5px solid #e2e8f0;'>
-                                                    <th style='padding:6px 14px;font-size:10px;font-weight:500;color:#6b7280;text-align:left;text-transform:uppercase;letter-spacing:.05em;'>Item</th>
-                                                    <th style='padding:6px 14px;font-size:10px;font-weight:500;color:#6b7280;text-align:center;text-transform:uppercase;letter-spacing:.05em;width:70px;'>Size</th>
-                                                    <th style='padding:6px 14px;font-size:10px;font-weight:500;color:#6b7280;text-align:center;text-transform:uppercase;letter-spacing:.05em;width:60px;'>Qty</th>
+                                                <tr style='background:#f1f5f9;'>
+                                                    <th style='padding:8px 16px;font-size:10.5px;font-weight:600;color:#64748b;
+                                                        text-align:left;text-transform:uppercase;letter-spacing:.07em;'>Item</th>
+                                                    <th style='padding:8px 16px;font-size:10.5px;font-weight:600;color:#64748b;
+                                                        text-align:center;text-transform:uppercase;letter-spacing:.07em;width:80px;'>Size</th>
+                                                    <th style='padding:8px 16px;font-size:10.5px;font-weight:600;color:#64748b;
+                                                        text-align:center;text-transform:uppercase;letter-spacing:.07em;width:70px;'>Qty</th>
                                                 </tr>
                                             </thead>
                                             <tbody>{$tableRows}</tbody>
                                             <tfoot>
-                                                <tr style='background:#f0fdf4;border-top:0.5px solid #bbf7d0;'>
-                                                    <td colspan='2' style='padding:6px 14px;font-size:11px;font-weight:500;color:#374151;text-align:right;'>Employee total</td>
-                                                    <td style='padding:6px 14px;font-size:13px;font-weight:600;color:#16a34a;text-align:center;white-space:nowrap;'>{$empQty}</td>
+                                                <tr style='background:#f0fdf4;border-top:1px solid #bbf7d0;'>
+                                                    <td colspan='2' style='padding:8px 16px;font-size:11.5px;
+                                                        font-weight:500;color:#6b7280;text-align:right;'>
+                                                        Employee total
+                                                    </td>
+                                                    <td style='padding:8px 16px;font-size:14px;font-weight:700;
+                                                        color:#16a34a;text-align:center;letter-spacing:-.02em;'>
+                                                        {$empQty}
+                                                    </td>
                                                 </tr>
                                             </tfoot>
                                         </table>
@@ -1348,7 +1401,7 @@ class UniformIssuancesTable
                                 $fields[] = \Filament\Forms\Components\Placeholder::make('emp_divider_' . $empIndex)
                                     ->label('')
                                     ->content(new \Illuminate\Support\HtmlString(
-                                        "<div style='border-top:1px dashed #e2e8f0;margin:8px 0 12px;'></div>"
+                                        "<div style='border-top:1px dashed #e2e8f0;margin:10px 0 14px;'></div>"
                                     ))
                                     ->columnSpanFull();
                             }
@@ -1390,6 +1443,9 @@ class UniformIssuancesTable
                             ->success()
                             ->send();
                     }),
+                
+                
+                // ─── BILLING ──────────────────────────────────────────────────────────────
                 Action::make('billing')
                     ->label('Billing')
                     ->color('warning')
@@ -1399,33 +1455,33 @@ class UniformIssuancesTable
                         if (!in_array($record->uniform_issuance_status, ['partial', 'issued'])) {
                             return false;
                         }
- 
+                
                         $typeName      = strtolower($record->uniformIssuanceType?->uniform_issuance_type_name ?? '');
                         $billableTypes = ['new hire', 'additional', 'annual', 'salary deduct'];
- 
+                
                         $isBillableType = false;
                         foreach ($billableTypes as $t) {
                             if (str_contains($typeName, $t)) { $isBillableType = true; break; }
                         }
- 
+                
                         if (!$isBillableType) return false;
- 
+                
                         $isSalaryDeduct = str_contains($typeName, 'salary deduct');
- 
+                
                         $record->loadMissing('uniformIssuanceRecipient.position');
                         $recipients = $record->uniformIssuanceRecipient;
- 
+                
                         if ($recipients->isNotEmpty()) {
                             $allRelievers = $recipients->every(function ($recipient) {
                                 return strtolower($recipient->position?->position_name ?? '') === 'reliever'
                                     || strtolower($recipient->employee_status ?? '') === 'reliever';
                             });
- 
+                
                             if ($allRelievers) return false;
                         }
- 
+                
                         if ($isSalaryDeduct) return true;
- 
+                
                         return \App\Models\ForDeliveryReceipt::where('uniform_issuance_id', $record->id)->exists();
                     })
                     ->modalSubmitAction(function ($action, $record) {
@@ -1443,21 +1499,20 @@ class UniformIssuancesTable
                             'site',
                             'uniformIssuanceType'
                         );
- 
+                
                         $existingBillings = \App\Models\UniformIssuanceBilling::where('uniform_issuance_id', $record->id)
                             ->latest()
                             ->get();
- 
-                        $existingHtml = '';
+                
                         if ($existingBillings->count() > 0) {
                             $rows = '';
                             foreach ($existingBillings as $billing) {
-                                $bg          = '#f8fafc';
                                 $statusColor = $billing->status === 'billed' ? '#16a34a' : '#d97706';
                                 $statusLabel = strtoupper($billing->status);
                                 $billedTo    = e($billing->billed_to);
                                 $total       = number_format($billing->total_price, 2);
                                 $date        = \Carbon\Carbon::parse($billing->created_at)->timezone('Asia/Manila')->format('M d, Y');
+                
                                 $typeLabel   = match ($billing->billing_type) {
                                     'client'        => 'CLIENT',
                                     'salary_deduct' => 'SALARY DEDUCT',
@@ -1468,84 +1523,105 @@ class UniformIssuancesTable
                                     'salary_deduct' => '#7c3aed',
                                     default         => '#6b7280',
                                 };
- 
+                
                                 $rows .= "
-                                    <tr style='background:{$bg};'>
-                                        <td style='padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:11px;font-weight:700;color:#1e3a5f;'>
+                                    <tr>
+                                        <td style='padding:10px 14px;font-size:12.5px;font-weight:600;color:#111827;border-bottom:1px solid #f1f5f9;'>
                                             {$billedTo}
                                         </td>
-                                        <td style='padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:11px;text-align:center;'>
-                                            <span style='background:{$typeBgColor};color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:999px;'>{$typeLabel}</span>
+                                        <td style='padding:10px 14px;font-size:12px;text-align:center;border-bottom:1px solid #f1f5f9;'>
+                                            <span style='background:{$typeBgColor};color:#fff;font-size:9.5px;font-weight:700;
+                                                padding:3px 9px;border-radius:999px;letter-spacing:.04em;'>{$typeLabel}</span>
                                         </td>
-                                        <td style='padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#374151;text-align:right;font-weight:700;'>&#x20B1;{$total}</td>
-                                        <td style='padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;text-align:center;'>{$date}</td>
-                                        <td style='padding:6px 10px;border-bottom:1px solid #e5e7eb;text-align:center;'>
-                                            <span style='background:{$statusColor};color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:999px;'>{$statusLabel}</span>
+                                        <td style='padding:10px 14px;font-size:13px;color:#1d4ed8;font-weight:700;
+                                            text-align:right;border-bottom:1px solid #f1f5f9;'>&#x20B1;{$total}</td>
+                                        <td style='padding:10px 14px;font-size:11.5px;color:#6b7280;
+                                            text-align:center;border-bottom:1px solid #f1f5f9;'>{$date}</td>
+                                        <td style='padding:10px 14px;text-align:center;border-bottom:1px solid #f1f5f9;'>
+                                            <span style='background:{$statusColor};color:#fff;font-size:9.5px;font-weight:700;
+                                                padding:3px 9px;border-radius:999px;letter-spacing:.04em;'>{$statusLabel}</span>
                                         </td>
                                     </tr>";
                             }
- 
+                
                             $grandTotal = number_format($existingBillings->sum('total_price'), 2);
- 
-                            $lockedNotice = "
-                                <div style='padding:8px 12px;background:#fef9c3;border:1px solid #fde68a;border-radius:6px;font-size:11px;color:#92400e;text-align:center;margin-top:12px;'>
-                                    A billing has already been created for this issuance. No further billing can be added.
-                                </div>";
- 
-                            $existingHtml = "
-                                <div style='margin-bottom:16px;'>
-                                    <div style='font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;'>
-                                        Existing Billings ({$existingBillings->count()})
-                                    </div>
-                                    <table style='width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;'>
-                                        <thead>
-                                            <tr style='background:#1e3a5f;'>
-                                                <th style='padding:5px 10px;text-align:left;font-size:10px;color:#fff;'>Billed To</th>
-                                                <th style='padding:5px 10px;text-align:center;font-size:10px;color:#fff;'>Type</th>
-                                                <th style='padding:5px 10px;text-align:right;font-size:10px;color:#fff;'>Total</th>
-                                                <th style='padding:5px 10px;text-align:center;font-size:10px;color:#fff;'>Date</th>
-                                                <th style='padding:5px 10px;text-align:center;font-size:10px;color:#fff;'>Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>{$rows}</tbody>
-                                        <tfoot>
-                                            <tr style='background:#f0f9ff;border-top:2px solid #93c5fd;'>
-                                                <td colspan='2' style='padding:6px 10px;font-size:11px;font-weight:700;color:#374151;text-align:right;'>GRAND TOTAL</td>
-                                                <td style='padding:6px 10px;font-size:13px;font-weight:900;color:#1d4ed8;text-align:right;'>&#x20B1;{$grandTotal}</td>
-                                                <td colspan='2'></td>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-                                    {$lockedNotice}
-                                </div>";
- 
+                
                             return new \Illuminate\Support\HtmlString("
-                                <div style='max-height:600px;overflow-y:auto;padding:2px;'>
-                                    {$existingHtml}
+                                <div style='font-family:\"DM Sans\",system-ui,sans-serif;'>
+                
+                                    <!-- Header label -->
+                                    <div style='font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;
+                                        letter-spacing:.08em;margin-bottom:10px;'>
+                                        Existing Billings &nbsp;({$existingBillings->count()})
+                                    </div>
+                
+                                    <!-- Table -->
+                                    <div style='border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;
+                                        box-shadow:0 1px 4px rgba(0,0,0,.05);margin-bottom:12px;'>
+                                        <table style='width:100%;border-collapse:collapse;'>
+                                            <thead>
+                                                <tr style='background:#1e3a5f;'>
+                                                    <th style='padding:10px 14px;text-align:left;font-size:10.5px;font-weight:600;
+                                                        color:#e0f2fe;text-transform:uppercase;letter-spacing:.07em;'>Billed To</th>
+                                                    <th style='padding:10px 14px;text-align:center;font-size:10.5px;font-weight:600;
+                                                        color:#e0f2fe;text-transform:uppercase;letter-spacing:.07em;'>Type</th>
+                                                    <th style='padding:10px 14px;text-align:right;font-size:10.5px;font-weight:600;
+                                                        color:#e0f2fe;text-transform:uppercase;letter-spacing:.07em;'>Total</th>
+                                                    <th style='padding:10px 14px;text-align:center;font-size:10.5px;font-weight:600;
+                                                        color:#e0f2fe;text-transform:uppercase;letter-spacing:.07em;'>Date</th>
+                                                    <th style='padding:10px 14px;text-align:center;font-size:10.5px;font-weight:600;
+                                                        color:#e0f2fe;text-transform:uppercase;letter-spacing:.07em;'>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>{$rows}</tbody>
+                                            <tfoot>
+                                                <tr style='background:#f0f9ff;border-top:2px solid #93c5fd;'>
+                                                    <td colspan='2' style='padding:10px 14px;font-size:11.5px;font-weight:600;
+                                                        color:#374151;text-align:right;'>Grand Total</td>
+                                                    <td style='padding:10px 14px;font-size:15px;font-weight:800;
+                                                        color:#1d4ed8;text-align:right;letter-spacing:-0.03em;'>&#x20B1;{$grandTotal}</td>
+                                                    <td colspan='2'></td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+                
+                                    <!-- Locked notice -->
+                                    <div style='padding:10px 14px;background:#fef9c3;border:1px solid #fde68a;border-radius:8px;
+                                        font-size:12px;color:#854d0e;text-align:center;font-weight:500;'>
+                                        &#9432;&nbsp; A billing already exists for this issuance. No additional billing can be added.
+                                    </div>
+                
                                 </div>
                             ");
                         }
- 
+                
                         $siteName = e($record->site?->site_name ?? '—');
                         $typeName = e($record->uniformIssuanceType?->uniform_issuance_type_name ?? '—');
                         $status   = strtoupper($record->uniform_issuance_status);
- 
+                
                         return new \Illuminate\Support\HtmlString("
-                            <div style='padding:8px 12px;background:#fefce8;border:1px solid #fde68a;border-radius:6px;font-size:12px;color:#374151;margin-bottom:10px;'>
-                                <strong style='color:#1e3a5f;'>{$siteName}</strong> &bull; {$typeName} &bull;
-                                <span style='color:#1d4ed8;font-weight:700;'>{$status}</span>
-                            </div>
-                            <div style='font-size:11px;color:#6b7280;'>
-                                Fill in the billing details below. Upload required documents per employee.
+                            <div style='font-family:\"DM Sans\",system-ui,sans-serif;'>
+                                <div style='display:flex;align-items:center;gap:10px;padding:10px 14px;
+                                    background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:12px;'>
+                                    <div style='width:8px;height:8px;border-radius:50%;background:#d97706;flex-shrink:0;'></div>
+                                    <span style='font-size:13px;font-weight:600;color:#1e3a5f;'>{$siteName}</span>
+                                    <span style='color:#d1d5db;'>·</span>
+                                    <span style='font-size:12.5px;color:#374151;'>{$typeName}</span>
+                                    <span style='margin-left:auto;font-size:11px;font-weight:700;color:#1d4ed8;
+                                        background:#dbeafe;padding:3px 10px;border-radius:999px;letter-spacing:.03em;'>{$status}</span>
+                                </div>
+                                <div style='font-size:12px;color:#6b7280;line-height:1.6;'>
+                                    Fill in billing details below. Upload required documents per employee where applicable.
+                                </div>
                             </div>
                         ");
                     })
                     ->form(function ($record) {
-                        // View-only if billing already exists
                         if (\App\Models\UniformIssuanceBilling::where('uniform_issuance_id', $record->id)->exists()) {
                             return [];
                         }
- 
+                
                         $record->load(
                             'uniformIssuanceRecipient.uniformIssuanceItem.uniformItem',
                             'uniformIssuanceRecipient.uniformIssuanceItem.uniformItemVariant',
@@ -1553,36 +1629,34 @@ class UniformIssuancesTable
                             'site',
                             'uniformIssuanceType'
                         );
- 
+                
                         $typeName        = strtolower($record->uniformIssuanceType?->uniform_issuance_type_name ?? '');
                         $isClientBilling = !str_contains($typeName, 'salary deduct');
                         $isSalaryDeduct  = str_contains($typeName, 'salary deduct');
- 
-                        // Determine if we need DR uploads (client billing + posted employees)
+                
                         $needsDrUpload = $isClientBilling && $record->uniformIssuanceRecipient->contains(
                             fn ($r) => strtolower($r->employee_status ?? '') === 'posted'
                         );
- 
+                
                         $defaultBilledTo = '';
                         if ($isClientBilling) {
                             $defaultBilledTo = $record->site?->client?->client_name
                                 ?? $record->site?->site_name
                                 ?? '';
                         }
- 
-                        // ── Build per-employee grouped items ──
-                        $grouped        = [];   // [ employeeName => [ items ] ]
-                        $recipientMeta  = [];   // [ employeeName => [ status, ... ] ]
- 
+                
+                        $grouped       = [];
+                        $recipientMeta = [];
+                
                         foreach ($record->uniformIssuanceRecipient as $recipient) {
                             $isReliever = strtolower($recipient->position?->position_name ?? '') === 'reliever'
                                 || strtolower($recipient->employee_status ?? '') === 'reliever';
- 
+                
                             if ($isClientBilling && $isReliever) continue;
- 
+                
                             $employeeName  = $recipient->employee_name ?? '—';
                             $employeeItems = [];
- 
+                
                             foreach ($recipient->uniformIssuanceItem as $item) {
                                 $qty = (int) $item->released_quantity;
                                 if ($qty <= 0) continue;
@@ -1598,7 +1672,7 @@ class UniformIssuancesTable
                                 }
                                 $employeeItems[$key]['quantity'] += $qty;
                             }
- 
+                
                             if (!empty($employeeItems)) {
                                 $grouped[$employeeName]       = array_values($employeeItems);
                                 $recipientMeta[$employeeName] = [
@@ -1606,8 +1680,7 @@ class UniformIssuancesTable
                                 ];
                             }
                         }
- 
-                        // ── Flat list for hidden field ──
+                
                         $billingItemsFlat = [];
                         foreach ($grouped as $empItems) {
                             foreach ($empItems as $row) {
@@ -1615,15 +1688,15 @@ class UniformIssuancesTable
                             }
                         }
                         $billingItemsJson = json_encode($billingItemsFlat, JSON_UNESCAPED_UNICODE);
- 
+                
                         $grandTotal = array_sum(array_map(
                             fn ($i) => (float) ($i['unit_price'] ?? 0) * (int) ($i['quantity'] ?? 0),
                             $billingItemsFlat
                         ));
- 
+                
                         $empCount = count($grouped);
                         $fields   = [];
- 
+                
                         // ── Billed To (client only) ──
                         if ($isClientBilling) {
                             $fields[] = \Filament\Forms\Components\TextInput::make('billed_to')
@@ -1631,16 +1704,21 @@ class UniformIssuancesTable
                                 ->default($defaultBilledTo)
                                 ->required()
                                 ->columnSpanFull();
- 
+                
                             $fields[] = \Filament\Forms\Components\Placeholder::make('client_info_note')
                                 ->label('')
                                 ->content(new \Illuminate\Support\HtmlString("
-                                    <div style='padding:10px 14px;background:#eff6ff;border:0.5px solid #bfdbfe;
-                                        border-radius:8px;font-size:13px;color:#374151;'>
+                                    <div style='font-family:\"DM Sans\",system-ui,sans-serif;padding:11px 15px;
+                                        background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;
+                                        font-size:12.5px;color:#374151;line-height:1.6;'>
                                         <strong style='color:#1e3a5f;'>Client billing</strong>
                                         — one billing record will be created for the client.
                                         Each employee's items are tracked individually below.
-                                        " . ($needsDrUpload ? "<br><span style='color:#7c3aed;font-size:12px;'>&#9432; <strong>Posted</strong> employees require a signed DR upload + DR number.</span>" : '') . "
+                                        " . ($needsDrUpload
+                                            ? "<br><span style='color:#7c3aed;font-size:12px;'>
+                                                &#9432; <strong>Posted</strong> employees require a signed DR upload and DR number.
+                                            </span>"
+                                            : '') . "
                                     </div>
                                 "))
                                 ->columnSpanFull();
@@ -1648,38 +1726,41 @@ class UniformIssuancesTable
                             $fields[] = \Filament\Forms\Components\Placeholder::make('salary_deduct_info')
                                 ->label('')
                                 ->content(new \Illuminate\Support\HtmlString("
-                                    <div style='padding:10px 14px;background:#f5f3ff;border:0.5px solid #ddd6fe;
-                                        border-radius:8px;font-size:13px;color:#374151;'>
+                                    <div style='font-family:\"DM Sans\",system-ui,sans-serif;padding:11px 15px;
+                                        background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;
+                                        font-size:12.5px;color:#374151;line-height:1.6;'>
                                         <strong style='color:#4c1d95;'>Salary deduct billing</strong>
-                                        — one billing record will be created <strong>per employee</strong>.
-                                        <br><span style='color:#7c3aed;font-size:12px;'>&#9432; Each employee requires a <strong>signed ATD image</strong> upload.</span>
+                                        — one billing record will be created <strong>per employee</strong>.<br>
+                                        <span style='color:#7c3aed;font-size:12px;'>
+                                            &#9432; A <strong>signed ATD</strong> upload is required for each employee.
+                                        </span>
                                     </div>
                                 "))
                                 ->columnSpanFull();
                         }
- 
+                
                         $fields[] = \Filament\Forms\Components\Hidden::make('status')->default('pending');
                         $fields[] = \Filament\Forms\Components\Hidden::make('billing_items')->default($billingItemsJson);
- 
-                        // ── Summary header ──
+                
+                        // ── Summary strip ──
                         $fields[] = \Filament\Forms\Components\Placeholder::make('billing_summary_header')
                             ->label('')
                             ->content(new \Illuminate\Support\HtmlString("
-                                <div style='display:flex;align-items:center;justify-content:space-between;
-                                    padding:8px 0 6px;border-bottom:0.5px solid #e5e7eb;margin-bottom:4px;'>
-                                    <span style='font-size:11px;font-weight:500;color:#6b7280;
-                                        text-transform:uppercase;letter-spacing:.06em;'>
-                                        {$empCount} employee" . ($empCount !== 1 ? 's' : '') . "
-                                        &nbsp;&middot;&nbsp; items
+                                <div style='font-family:\"DM Sans\",system-ui,sans-serif;
+                                    display:flex;align-items:center;justify-content:space-between;
+                                    padding:10px 0 8px;border-bottom:1.5px solid #e5e7eb;margin-top:4px;'>
+                                    <span style='font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.08em;'>
+                                        {$empCount}&nbsp;employee" . ($empCount !== 1 ? 's' : '') . "
                                     </span>
-                                    <span style='font-size:15px;font-weight:500;color:#185FA5;'>
-                                        Grand total: &#x20B1;" . number_format($grandTotal, 2) . "
+                                    <span style='font-size:14px;font-weight:700;color:#1d4ed8;letter-spacing:-0.03em;'>
+                                        &#x20B1;" . number_format($grandTotal, 2) . "
+                                        &nbsp;<span style='font-size:11px;font-weight:500;color:#6b7280;'>grand total</span>
                                     </span>
                                 </div>
                             "))
                             ->columnSpanFull();
- 
-                        // ── Per-employee cards + upload fields ──
+                
+                        // ── Per-employee cards ──
                         $avatarStyles = [
                             ['bg' => '#E6F1FB', 'color' => '#0C447C'],
                             ['bg' => '#E1F5EE', 'color' => '#0F6E56'],
@@ -1687,42 +1768,53 @@ class UniformIssuancesTable
                             ['bg' => '#FAEEDA', 'color' => '#633806'],
                             ['bg' => '#FAECE7', 'color' => '#712B13'],
                         ];
- 
+                
                         $empIndex = 0;
                         foreach ($grouped as $employeeName => $empItems) {
                             $empIndex++;
- 
+                
                             $empTotal = array_sum(array_map(
                                 fn ($i) => (float) ($i['unit_price'] ?? 0) * (int) ($i['quantity'] ?? 0),
                                 $empItems
                             ));
- 
+                
                             $words    = explode(' ', trim($employeeName));
                             $initials = strtoupper(
                                 (isset($words[0]) ? substr($words[0], 0, 1) : '') .
                                 (isset($words[1]) ? substr($words[1], 0, 1) : '')
                             );
- 
-                            $av             = $avatarStyles[($empIndex - 1) % count($avatarStyles)];
-                            $empStatus      = $recipientMeta[$employeeName]['employee_status'] ?? '';
-                            $isPosted       = $empStatus === 'posted';
-                            $needsAtd       = $isSalaryDeduct;
-                            $needsDrForEmp  = $isClientBilling && $isPosted;
- 
+                
+                            $av            = $avatarStyles[($empIndex - 1) % count($avatarStyles)];
+                            $empStatus     = $recipientMeta[$employeeName]['employee_status'] ?? '';
+                            $isPosted      = $empStatus === 'posted';
+                            $needsAtd      = $isSalaryDeduct;
+                            $needsDrForEmp = $isClientBilling && $isPosted;
+                            $safeKey       = 'emp_' . $empIndex;
+                
                             $tableRows = '';
                             foreach ($empItems as $item) {
                                 $sub        = (float) ($item['unit_price'] ?? 0) * (int) ($item['quantity'] ?? 0);
                                 $tableRows .= "
-                                    <tr style='border-bottom:0.5px solid #f1f5f9;'>
-                                        <td style='padding:7px 14px;font-size:12px;color:#111827;'>" . e($item['item_name']) . "</td>
-                                        <td style='padding:7px 14px;font-size:12px;color:#374151;text-align:center;'>" . e($item['size']) . "</td>
-                                        <td style='padding:7px 14px;font-size:12px;color:#185FA5;font-weight:500;text-align:center;'>" . (int) $item['quantity'] . "</td>
-                                        <td style='padding:7px 14px;font-size:12px;color:#374151;text-align:right;'>&#x20B1;" . number_format((float) $item['unit_price'], 2) . "</td>
-                                        <td style='padding:7px 14px;font-size:12px;color:#374151;font-weight:500;text-align:right;'>&#x20B1;" . number_format($sub, 2) . "</td>
+                                    <tr>
+                                        <td style='padding:9px 16px;font-size:12.5px;color:#111827;border-bottom:1px solid #f1f5f9;'>
+                                            " . e($item['item_name']) . "
+                                        </td>
+                                        <td style='padding:9px 16px;font-size:12.5px;color:#374151;text-align:center;border-bottom:1px solid #f1f5f9;'>
+                                            " . e($item['size']) . "
+                                        </td>
+                                        <td style='padding:9px 16px;font-size:12.5px;font-weight:600;color:#1d4ed8;text-align:center;border-bottom:1px solid #f1f5f9;'>
+                                            " . (int) $item['quantity'] . "
+                                        </td>
+                                        <td style='padding:9px 16px;font-size:12.5px;color:#374151;text-align:right;border-bottom:1px solid #f1f5f9;'>
+                                            &#x20B1;" . number_format((float) $item['unit_price'], 2) . "
+                                        </td>
+                                        <td style='padding:9px 16px;font-size:12.5px;font-weight:600;color:#111827;text-align:right;border-bottom:1px solid #f1f5f9;'>
+                                            &#x20B1;" . number_format($sub, 2) . "
+                                        </td>
                                     </tr>";
                             }
- 
-                            // Status badge for card header
+                
+                            // Status badge
                             $statusBadgeHtml = '';
                             if ($empStatus) {
                                 $statusBadgeColor = match($empStatus) {
@@ -1733,170 +1825,229 @@ class UniformIssuancesTable
                                     'contractual'  => '#0d9488',
                                     default        => '#6b7280',
                                 };
-                                $statusBadgeHtml = "<span style='background:{$statusBadgeColor};color:#fff;font-size:9px;
-                                    font-weight:700;padding:2px 8px;border-radius:999px;margin-left:6px;'>"
-                                    . strtoupper($empStatus) . "</span>";
+                                $statusBadgeHtml = "
+                                    <span style='background:{$statusBadgeColor};color:#fff;font-size:9.5px;font-weight:700;
+                                        padding:2px 9px;border-radius:999px;margin-left:8px;letter-spacing:.04em;vertical-align:middle;'>
+                                        " . strtoupper($empStatus) . "
+                                    </span>";
                             }
- 
+                
+                            // Upload section label — ATD or DR
+                            $uploadSectionHtml = '';
+                            if ($needsAtd) {
+                                $uploadSectionHtml = "
+                                    <div style='padding:12px 16px 4px;border-top:1px solid #ede9fe;background:#faf5ff;'>
+                                        <div style='display:flex;align-items:center;gap:8px;margin-bottom:6px;'>
+                                            <span style='width:7px;height:7px;border-radius:50%;background:#7c3aed;flex-shrink:0;display:inline-block;'></span>
+                                            <span style='font-size:11.5px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:.06em;'>
+                                                Signed ATD Required
+                                            </span>
+                                            <span style='font-size:10.5px;color:#9ca3af;font-weight:400;'>(required)</span>
+                                        </div>
+                                        <div style='font-size:11.5px;color:#6b7280;line-height:1.5;padding-left:15px;'>
+                                            Upload acknowledgement document for <strong style='color:#4c1d95;'>" . e($employeeName) . "</strong>
+                                        </div>
+                                    </div>";
+                            } elseif ($needsDrForEmp) {
+                                $uploadSectionHtml = "
+                                    <div style='padding:12px 16px 4px;border-top:1px solid #ede9fe;background:#faf5ff;'>
+                                        <div style='display:flex;align-items:center;gap:8px;margin-bottom:6px;'>
+                                            <span style='width:7px;height:7px;border-radius:50%;background:#7c3aed;flex-shrink:0;display:inline-block;'></span>
+                                            <span style='font-size:11.5px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:.06em;'>
+                                                Signed DR Required
+                                            </span>
+                                            <span style='font-size:10.5px;color:#9ca3af;font-weight:400;'>(posted employee · required)</span>
+                                        </div>
+                                        <div style='font-size:11.5px;color:#6b7280;line-height:1.5;padding-left:15px;'>
+                                            Upload signed delivery receipt for <strong style='color:#4c1d95;'>" . e($employeeName) . "</strong>
+                                        </div>
+                                    </div>";
+                            }
+                
+                            /*
+                            * The card and the upload label are ONE visual block.
+                            * The upload label is rendered inside the card's bottom section
+                            * so it always appears immediately below the items table,
+                            * flush and connected — not floating separately below.
+                            *
+                            * The actual Filament FileUpload / DatePicker / TextInput fields
+                            * are rendered by Filament right after this Placeholder, and they
+                            * sit visually inside the purple section because we give them
+                            * matching background via the wrapper below.
+                            */
                             $cardHtml = "
-                                <div style='background:#fff;border:0.5px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:4px;'>
-                                    <div style='display:flex;align-items:center;gap:10px;padding:10px 14px;
-                                        background:#f8fafc;border-bottom:0.5px solid #e2e8f0;'>
-                                        <div style='width:34px;height:34px;border-radius:50%;background:{$av['bg']};
+                                <div style='font-family:\"DM Sans\",system-ui,sans-serif;
+                                    border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;
+                                    box-shadow:0 1px 4px rgba(0,0,0,.05);'>
+                
+                                    <!-- Employee header -->
+                                    <div style='display:flex;align-items:center;gap:12px;
+                                        padding:12px 16px;background:#f8fafc;border-bottom:1px solid #e2e8f0;'>
+                                        <div style='width:36px;height:36px;border-radius:50%;background:{$av['bg']};flex-shrink:0;
                                             display:flex;align-items:center;justify-content:center;
-                                            font-size:12px;font-weight:600;color:{$av['color']};flex-shrink:0;'>
+                                            font-size:12.5px;font-weight:700;color:{$av['color']};letter-spacing:.02em;'>
                                             {$initials}
                                         </div>
-                                        <div>
-                                            <div style='font-size:14px;font-weight:500;color:#111827;display:flex;align-items:center;'>
-                                                " . e($employeeName) . "{$statusBadgeHtml}
+                                        <div style='flex:1;min-width:0;'>
+                                            <div style='font-size:13.5px;font-weight:600;color:#111827;
+                                                letter-spacing:-0.01em;display:flex;align-items:center;flex-wrap:wrap;gap:4px;'>
+                                                " . e($employeeName) . "
+                                                {$statusBadgeHtml}
                                             </div>
-                                            <div style='font-size:11px;color:#6b7280;margin-top:1px;'>Employee #{$empIndex}</div>
+                                            <div style='font-size:11px;color:#9ca3af;margin-top:2px;'>Employee #{$empIndex}</div>
                                         </div>
-                                        <span style='margin-left:auto;background:{$av['bg']};color:{$av['color']};
-                                            font-size:12px;font-weight:600;padding:3px 12px;border-radius:999px;white-space:nowrap;'>
+                                        <div style='background:{$av['bg']};color:{$av['color']};
+                                            font-size:13px;font-weight:700;padding:4px 14px;
+                                            border-radius:999px;white-space:nowrap;flex-shrink:0;letter-spacing:-.01em;'>
                                             &#x20B1;" . number_format($empTotal, 2) . "
-                                        </span>
+                                        </div>
                                     </div>
+                
+                                    <!-- Items table -->
                                     <div style='overflow-x:auto;'>
-                                        <table style='width:100%;border-collapse:collapse;min-width:420px;'>
+                                        <table style='width:100%;border-collapse:collapse;min-width:400px;'>
                                             <thead>
-                                                <tr style='background:#f8fafc;border-bottom:0.5px solid #e2e8f0;'>
-                                                    <th style='padding:6px 14px;font-size:10px;font-weight:500;color:#6b7280;text-align:left;text-transform:uppercase;letter-spacing:.05em;'>Item</th>
-                                                    <th style='padding:6px 14px;font-size:10px;font-weight:500;color:#6b7280;text-align:center;text-transform:uppercase;letter-spacing:.05em;width:55px;'>Size</th>
-                                                    <th style='padding:6px 14px;font-size:10px;font-weight:500;color:#6b7280;text-align:center;text-transform:uppercase;letter-spacing:.05em;width:50px;'>Qty</th>
-                                                    <th style='padding:6px 14px;font-size:10px;font-weight:500;color:#6b7280;text-align:right;text-transform:uppercase;letter-spacing:.05em;width:100px;'>Unit price</th>
-                                                    <th style='padding:6px 14px;font-size:10px;font-weight:500;color:#6b7280;text-align:right;text-transform:uppercase;letter-spacing:.05em;width:90px;'>Subtotal</th>
+                                                <tr style='background:#f1f5f9;'>
+                                                    <th style='padding:8px 16px;font-size:10.5px;font-weight:600;color:#64748b;
+                                                        text-align:left;text-transform:uppercase;letter-spacing:.07em;'>Item</th>
+                                                    <th style='padding:8px 16px;font-size:10.5px;font-weight:600;color:#64748b;
+                                                        text-align:center;text-transform:uppercase;letter-spacing:.07em;width:65px;'>Size</th>
+                                                    <th style='padding:8px 16px;font-size:10.5px;font-weight:600;color:#64748b;
+                                                        text-align:center;text-transform:uppercase;letter-spacing:.07em;width:55px;'>Qty</th>
+                                                    <th style='padding:8px 16px;font-size:10.5px;font-weight:600;color:#64748b;
+                                                        text-align:right;text-transform:uppercase;letter-spacing:.07em;width:110px;'>Unit Price</th>
+                                                    <th style='padding:8px 16px;font-size:10.5px;font-weight:600;color:#64748b;
+                                                        text-align:right;text-transform:uppercase;letter-spacing:.07em;width:100px;'>Subtotal</th>
                                                 </tr>
                                             </thead>
                                             <tbody>{$tableRows}</tbody>
                                             <tfoot>
-                                                <tr style='background:#f0f9ff;border-top:0.5px solid #bfdbfe;'>
-                                                    <td colspan='4' style='padding:6px 14px;font-size:11px;font-weight:500;color:#374151;text-align:right;'>Employee total</td>
-                                                    <td style='padding:6px 14px;font-size:13px;font-weight:600;color:#185FA5;text-align:right;white-space:nowrap;'>
+                                                <tr style='background:#f0f9ff;border-top:1px solid #bfdbfe;'>
+                                                    <td colspan='4' style='padding:8px 16px;font-size:11.5px;
+                                                        font-weight:500;color:#6b7280;text-align:right;'>
+                                                        Employee total
+                                                    </td>
+                                                    <td style='padding:8px 16px;font-size:14px;font-weight:700;
+                                                        color:#1d4ed8;text-align:right;letter-spacing:-.02em;'>
                                                         &#x20B1;" . number_format($empTotal, 2) . "
                                                     </td>
                                                 </tr>
                                             </tfoot>
                                         </table>
                                     </div>
+                
+                                    {$uploadSectionHtml}
                                 </div>";
- 
+                
                             $fields[] = \Filament\Forms\Components\Placeholder::make('emp_card_' . $empIndex)
                                 ->label('')
                                 ->content(new \Illuminate\Support\HtmlString($cardHtml))
                                 ->columnSpanFull();
- 
-                            // ── ATD upload section (salary deduct) ──
+                
+                            // ── ATD upload fields — rendered immediately after the card, styled to connect ──
                             if ($needsAtd) {
-                                $safeKey = 'emp_' . $empIndex;
- 
-                                $fields[] = \Filament\Forms\Components\Placeholder::make("atd_header_{$safeKey}")
-                                    ->label('')
-                                    ->content(new \Illuminate\Support\HtmlString("
-                                        <div style='display:flex;align-items:center;gap:8px;padding:6px 0 4px;'>
-                                            <span style='width:6px;height:6px;border-radius:50%;background:#7c3aed;display:inline-block;'></span>
-                                            <span style='font-size:11px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:.05em;'>
-                                                Signed ATD — " . e($employeeName) . "
-                                            </span>
-                                            <span style='font-size:10px;color:#9ca3af;'>(required)</span>
-                                        </div>
-                                    "))
-                                    ->columnSpanFull();
- 
                                 $fields[] = \Filament\Forms\Components\FileUpload::make("atd_image_{$safeKey}")
-                                    ->label('ATD Image')
-                                    ->helperText('Upload the signed Acknowledgement/ATD document for ' . $employeeName)
+                                    ->label('ATD Document')
+                                    ->helperText('Upload the signed Acknowledgement/ATD for ' . $employeeName)
                                     ->image()
-                                    ->imagePreviewHeight('120')
+                                    ->imagePreviewHeight('130')
                                     ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
                                     ->directory('billing-atd')
                                     ->required()
-                                    ->columnSpanFull();
- 
+                                    ->columnSpanFull()
+                                    ->extraAttributes([
+                                        'style' => 'background:#faf5ff;border:1px solid #e9d5ff;border-top:0;
+                                            border-radius:0 0 12px 12px;padding:14px 16px;margin-top:-2px;',
+                                    ]);
+                
                                 $fields[] = \Filament\Forms\Components\DatePicker::make("atd_date_signed_{$safeKey}")
                                     ->label('Date Signed')
                                     ->default(now()->toDateString())
-                                    ->required();
- 
+                                    ->required()
+                                    ->extraAttributes([
+                                        'style' => 'background:#faf5ff;',
+                                    ]);
+                
                                 $fields[] = \Filament\Forms\Components\TextInput::make("atd_remarks_{$safeKey}")
                                     ->label('Remarks')
-                                    ->placeholder('Optional notes');
+                                    ->placeholder('Optional notes')
+                                    ->extraAttributes([
+                                        'style' => 'background:#faf5ff;',
+                                    ]);
                             }
- 
-                            // ── DR upload section (client billing, posted employee) ──
+                
+                            // ── DR upload fields — same treatment ──
                             if ($needsDrForEmp) {
-                                $safeKey = 'emp_' . $empIndex;
- 
-                                $fields[] = \Filament\Forms\Components\Placeholder::make("dr_header_{$safeKey}")
-                                    ->label('')
-                                    ->content(new \Illuminate\Support\HtmlString("
-                                        <div style='display:flex;align-items:center;gap:8px;padding:6px 0 4px;'>
-                                            <span style='width:6px;height:6px;border-radius:50%;background:#7c3aed;display:inline-block;'></span>
-                                            <span style='font-size:11px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:.05em;'>
-                                                Signed DR — " . e($employeeName) . "
-                                            </span>
-                                            <span style='font-size:10px;color:#9ca3af;'>(posted employee — required)</span>
-                                        </div>
-                                    "))
-                                    ->columnSpanFull();
- 
                                 $fields[] = \Filament\Forms\Components\TextInput::make("dr_number_{$safeKey}")
                                     ->label('DR Number')
                                     ->placeholder('e.g. DR-2024-001')
-                                    ->required();
- 
+                                    ->required()
+                                    ->extraAttributes([
+                                        'style' => 'background:#faf5ff;border:1px solid #e9d5ff;border-top:0;
+                                            border-radius:0;padding:14px 16px;margin-top:-2px;',
+                                    ]);
+                
                                 $fields[] = \Filament\Forms\Components\FileUpload::make("dr_image_{$safeKey}")
                                     ->label('Signed DR Image')
                                     ->helperText('Upload the signed Delivery Receipt for ' . $employeeName)
                                     ->image()
-                                    ->imagePreviewHeight('120')
+                                    ->imagePreviewHeight('130')
                                     ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
                                     ->directory('billing-dr')
                                     ->required()
-                                    ->columnSpanFull();
- 
+                                    ->columnSpanFull()
+                                    ->extraAttributes([
+                                        'style' => 'background:#faf5ff;border:1px solid #e9d5ff;border-top:0;
+                                            border-radius:0;padding:14px 16px;margin-top:-2px;',
+                                    ]);
+                
                                 $fields[] = \Filament\Forms\Components\DatePicker::make("dr_date_signed_{$safeKey}")
                                     ->label('Date Signed')
                                     ->default(now()->toDateString())
-                                    ->required();
- 
+                                    ->required()
+                                    ->extraAttributes([
+                                        'style' => 'background:#faf5ff;',
+                                    ]);
+                
                                 $fields[] = \Filament\Forms\Components\TextInput::make("dr_remarks_{$safeKey}")
                                     ->label('Remarks')
-                                    ->placeholder('Optional notes');
+                                    ->placeholder('Optional notes')
+                                    ->extraAttributes([
+                                        'style' => 'background:#faf5ff;border:1px solid #e9d5ff;border-top:0;
+                                            border-radius:0 0 12px 12px;padding:14px 16px;margin-top:-2px;',
+                                    ]);
                             }
- 
+                
                             if ($empIndex < $empCount) {
                                 $fields[] = \Filament\Forms\Components\Placeholder::make('emp_divider_' . $empIndex)
                                     ->label('')
                                     ->content(new \Illuminate\Support\HtmlString(
-                                        "<div style='border-top:1px dashed #e2e8f0;margin:8px 0 12px;'></div>"
+                                        "<div style='border-top:1px dashed #e2e8f0;margin:14px 0 16px;'></div>"
                                     ))
                                     ->columnSpanFull();
                             }
                         }
- 
+                
                         return $fields;
                     })
                     ->action(function ($record, array $data, Action $action) {
-                        // Double-guard: silently abort if billing already exists
                         if (\App\Models\UniformIssuanceBilling::where('uniform_issuance_id', $record->id)->exists()) {
                             return;
                         }
- 
+                
                         $record->load(
                             'uniformIssuanceRecipient.uniformIssuanceItem.uniformItem',
                             'uniformIssuanceRecipient.uniformIssuanceItem.uniformItemVariant',
                             'uniformIssuanceRecipient.position',
                             'uniformIssuanceType'
                         );
- 
+                
                         $typeName        = strtolower($record->uniformIssuanceType?->uniform_issuance_type_name ?? '');
                         $isClientBilling = !str_contains($typeName, 'salary deduct');
                         $isSalaryDeduct  = str_contains($typeName, 'salary deduct');
- 
+                
                         $billingItems = json_decode($data['billing_items'] ?? '[]', true);
- 
+                
                         if (!is_array($billingItems) || empty($billingItems)) {
                             \Filament\Notifications\Notification::make()
                                 ->title('No billing items')
@@ -1906,39 +2057,36 @@ class UniformIssuancesTable
                             $action->halt();
                             return;
                         }
- 
+                
                         $computeTotal = fn (array $items) => array_sum(
                             array_map(fn ($i) => (float) ($i['unit_price'] ?? 0) * (int) ($i['quantity'] ?? 0), $items)
                         );
- 
-                        // ── Re-group items by employee ──
-                        $grouped        = [];
-                        $recipientMeta  = [];
- 
+                
+                        $grouped       = [];
+                        $recipientMeta = [];
+                
                         foreach ($billingItems as $item) {
                             $emp = $item['employee'] ?? '—';
                             $grouped[$emp][] = $item;
                         }
- 
-                        // Re-build employee status map from recipients
+                
                         foreach ($record->uniformIssuanceRecipient as $recipient) {
                             $name = $recipient->employee_name ?? '—';
                             $recipientMeta[$name] = [
                                 'employee_status' => strtolower($recipient->employee_status ?? ''),
                             ];
                         }
- 
-                        // ── Build safe key index — must match the form ──
+                
                         $empIndexMap = [];
                         $idx = 0;
                         foreach ($grouped as $empName => $items) {
                             $idx++;
                             $empIndexMap[$empName] = $idx;
                         }
- 
+                
                         if ($isClientBilling) {
                             $total = $computeTotal($billingItems);
- 
+                
                             $billing = \App\Models\UniformIssuanceBilling::create([
                                 'uniform_issuance_id'   => $record->id,
                                 'billed_to'             => $data['billed_to'] ?? $record->site?->site_name ?? '—',
@@ -1951,44 +2099,38 @@ class UniformIssuancesTable
                                 'created_by'            => \Illuminate\Support\Facades\Auth::id(),
                                 'signed_receiving_copy' => null,
                             ]);
- 
-                            // ── Save DR records for posted employees ──
+                
                             foreach ($grouped as $empName => $items) {
                                 $empStatus = $recipientMeta[$empName]['employee_status'] ?? '';
                                 $safeKey   = 'emp_' . ($empIndexMap[$empName] ?? 0);
- 
+                
                                 if ($empStatus === 'posted') {
-                                    $drImage    = $data["dr_image_{$safeKey}"]    ?? null;
-                                    $drNumber   = $data["dr_number_{$safeKey}"]   ?? null;
-                                    $drDate     = $data["dr_date_signed_{$safeKey}"] ?? null;
-                                    $drRemarks  = $data["dr_remarks_{$safeKey}"]  ?? null;
- 
                                     \App\Models\BillingDr::create([
                                         'uniform_issuance_id'          => $record->id,
                                         'uniform_issuance_billing_id'  => $billing->id,
                                         'employee_name'                => $empName,
-                                        'dr_number'                    => $drNumber ?? '—',
-                                        'date_signed'                  => $drDate,
-                                        'dr_image'                     => $drImage,
-                                        'remarks'                      => $drRemarks,
+                                        'dr_number'                    => $data["dr_number_{$safeKey}"] ?? '—',
+                                        'date_signed'                  => $data["dr_date_signed_{$safeKey}"] ?? null,
+                                        'dr_image'                     => $data["dr_image_{$safeKey}"] ?? null,
+                                        'remarks'                      => $data["dr_remarks_{$safeKey}"] ?? null,
                                         'uploaded_by'                  => \Illuminate\Support\Facades\Auth::id(),
                                     ]);
                                 }
                             }
- 
+                
                             \Filament\Notifications\Notification::make()
                                 ->title('Billing Created')
                                 ->body('Client billing of ₱' . number_format($total, 2) . ' saved successfully.')
                                 ->success()
                                 ->send();
- 
+                
                         } elseif ($isSalaryDeduct) {
                             $count = 0;
- 
+                
                             foreach ($grouped as $employeeName => $items) {
                                 $total   = $computeTotal($items);
                                 $safeKey = 'emp_' . ($empIndexMap[$employeeName] ?? 0);
- 
+                
                                 $billing = \App\Models\UniformIssuanceBilling::create([
                                     'uniform_issuance_id'   => $record->id,
                                     'billed_to'             => $employeeName,
@@ -2001,41 +2143,29 @@ class UniformIssuancesTable
                                     'created_by'            => \Illuminate\Support\Facades\Auth::id(),
                                     'signed_receiving_copy' => null,
                                 ]);
-
-                                $index = $count + 1;
- 
-                                // ── Save ATD record per employee ──
-                                $atdImage   = $data["atd_image_emp_{$index}"]      ?? $data["atd_image_{$safeKey}"]      ?? null;
-                                $atdDate    = $data["atd_date_signed_emp_{$index}"] ?? $data["atd_date_signed_{$safeKey}"] ?? null;
-                                $atdRemarks = $data["atd_remarks_emp_{$index}"]    ?? $data["atd_remarks_{$safeKey}"]    ?? null;
- 
-                                // Use the correct safeKey derived from empIndexMap
-                                $atdImage   = $data["atd_image_{$safeKey}"]      ?? null;
-                                $atdDate    = $data["atd_date_signed_{$safeKey}"] ?? null;
-                                $atdRemarks = $data["atd_remarks_{$safeKey}"]    ?? null;
- 
+                
                                 \App\Models\BillingAtd::create([
                                     'uniform_issuance_id'          => $record->id,
                                     'uniform_issuance_billing_id'  => $billing->id,
                                     'employee_name'                => $employeeName,
-                                    'date_signed'                  => $atdDate,
-                                    'atd_image'                    => $atdImage,
-                                    'remarks'                      => $atdRemarks,
+                                    'date_signed'                  => $data["atd_date_signed_{$safeKey}"] ?? null,
+                                    'atd_image'                    => $data["atd_image_{$safeKey}"] ?? null,
+                                    'remarks'                      => $data["atd_remarks_{$safeKey}"] ?? null,
                                     'uploaded_by'                  => \Illuminate\Support\Facades\Auth::id(),
                                 ]);
- 
+                
                                 $count++;
                             }
- 
+                
                             \Filament\Notifications\Notification::make()
                                 ->title('Billings Created')
                                 ->body("{$count} salary deduct billing(s) created successfully.")
                                 ->success()
                                 ->send();
- 
+                
                         } else {
                             $total = $computeTotal($billingItems);
- 
+                
                             \App\Models\UniformIssuanceBilling::create([
                                 'uniform_issuance_id'   => $record->id,
                                 'billed_to'             => $data['billed_to'] ?? '—',
@@ -2048,7 +2178,7 @@ class UniformIssuancesTable
                                 'created_by'            => \Illuminate\Support\Facades\Auth::id(),
                                 'signed_receiving_copy' => null,
                             ]);
- 
+                
                             \Filament\Notifications\Notification::make()
                                 ->title('Billing Saved')
                                 ->success()
