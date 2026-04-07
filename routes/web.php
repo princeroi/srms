@@ -39,3 +39,11 @@ Route::prefix('uniform-issuances')->name('uniform-issuances.')->middleware('auth
 
 });
 
+Route::get('/private-image/{disk}/{path}', function ($disk, $path) {
+    $path = base64_decode($path);
+    if (!\Storage::disk($disk)->exists($path)) {
+        abort(404);
+    }
+    return response()->file(storage_path('app/private/' . $path));
+})->middleware('auth')->name('private.image');
+

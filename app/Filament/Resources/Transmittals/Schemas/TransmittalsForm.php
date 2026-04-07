@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Resources\ForDeliveryReceipts\Schemas;
+namespace App\Filament\Resources\Transmittals\Schemas;
 
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Repeater;
@@ -8,19 +8,22 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
 
-class ForDeliveryReceiptForm
+class TransmittalsForm
 {
     public static function configure(Schema $schema): Schema
     {
         return $schema
             ->components([
-                TextInput::make('endorse_by')
+                TextInput::make('uniform_issuance_id')
+                    ->numeric(),
+                TextInput::make('transmittal_number')
                     ->required(),
-
-                DatePicker::make('endorse_date'),
-
-                Repeater::make('item_summary')
-                    ->label('Item Summary')
+                TextInput::make('transmitted_by')
+                    ->required(),
+                TextInput::make('transmitted_to')
+                    ->required(),
+                Repeater::make('items_summary')
+                    ->label('Items Summary')
                     ->schema([
                         TextInput::make('item')
                             ->label('Item')
@@ -42,24 +45,14 @@ class ForDeliveryReceiptForm
                     ->defaultItems(1)
                     ->collapsible()
                     ->cloneable(),
-
-                TextInput::make('dr_number')
-                    ->label('DR Number')
-                    ->placeholder('Enter DR Number (auto-sets status to Done)')
-                    ->maxLength(255)
-                    ->dehydrated(false),
-
-                Select::make('status')
-                    ->options(['pending' => 'Pending', 'done' => 'Done', 'cancelled' => 'Cancelled'])
-                    ->default('done')
-                    ->hidden()
+                TextInput::make('purpose'),
+                TextInput::make('instructions'),
+                DatePicker::make('transmitted_at')
                     ->required(),
-
-                DatePicker::make('done_date')
-                    ->hidden()
-                    ->default(now()),
-
-                TextInput::make('remarks'),
+                Select::make('status')
+                    ->options(['pending' => 'Pending', 'received' => 'Received'])
+                    ->default('pending')
+                    ->required(),
             ]);
     }
 }

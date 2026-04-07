@@ -16,11 +16,21 @@ class Transmittals extends Model
         'instructions',
         'transmitted_at',
         'status',
+        'received_from_office',
+        'date_received_from_office',
+        'received_from_site',
+        'date_received_from_site',
+        'remarks',
+        'returned_by',
+        'date_returned',
     ];
- 
+
     protected $casts = [
-        'items_summary'  => 'array',
-        'transmitted_at' => 'date',
+        'items_summary'             => 'array',
+        'transmitted_at'            => 'date',
+        'date_received_from_office' => 'date',
+        'date_received_from_site'   => 'date',
+        'date_returned'             => 'date',
     ];
  
     public function uniformIssuance(): BelongsTo

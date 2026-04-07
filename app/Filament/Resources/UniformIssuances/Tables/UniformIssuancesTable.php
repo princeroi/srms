@@ -80,34 +80,68 @@ class UniformIssuancesTable
                     ->color('gray')
                     ->icon('heroicon-o-eye')
                     ->modalWidth('3xl')
+                    ->modalHeading(fn ($record) => 'Issuance — ' . ($record->site?->site_name ?? '—'))
                     ->modalContent(function ($record) {
                         $record->loadMissing(
                             'uniformIssuanceRecipient.uniformIssuanceItem.uniformItem',
                             'uniformIssuanceRecipient.uniformIssuanceItem.uniformItemVariant',
-                            'uniformIssuanceRecipient.position'
+                            'uniformIssuanceRecipient.position',
+                            'site',
+                            'uniformIssuanceType'
                         );
 
-                        $html = '';
+                        $siteName = e($record->site?->site_name ?? '—');
+                        $typeName = e($record->uniformIssuanceType?->uniform_issuance_type_name ?? '—');
 
-                        foreach ($record->uniformIssuanceRecipient as $recipient) {
+                        $statusColor = match ($record->uniform_issuance_status) {
+                            'issued'    => '#16a34a',
+                            'partial'   => '#d97706',
+                            'pending'   => '#2563eb',
+                            'cancelled' => '#dc2626',
+                            default     => '#6b7280',
+                        };
+                        $statusLabel = strtoupper($record->uniform_issuance_status ?? 'PENDING');
+
+                        $statusDate = match ($record->uniform_issuance_status) {
+                            'pending'   => $record->pending_at,
+                            'partial'   => $record->partial_at,
+                            'issued'    => $record->issued_at,
+                            'cancelled' => $record->cancelled_at,
+                            default     => null,
+                        };
+                        $statusDateFormatted = $statusDate
+                            ? \Carbon\Carbon::parse($statusDate)->format('F d, Y')
+                            : '—';
+
+                        // ── Per-recipient blocks ──────────────────────────────
+                        $recipientBlocks = '';
+                        $grandTotalQty       = 0;
+                        $grandTotalReleased  = 0;
+                        $grandTotalRemaining = 0;
+
+                        foreach ($record->uniformIssuanceRecipient as $ri => $recipient) {
                             $employee       = e($recipient->employee_name ?? '—');
                             $position       = e($recipient->position?->position_name ?? '—');
-                            $employeeStatus = $recipient->employee_status ?? null;
+                            $employeeStatus = strtolower($recipient->employee_status ?? '');
 
                             $statusBadgeHtml = '';
                             if ($employeeStatus) {
-                                $statusColor = match(strtolower($employeeStatus)) {
-                                    'regular'   => '#16a34a',
-                                    'reliever'  => '#d97706',
+                                $empStatusColor = match ($employeeStatus) {
+                                    'regular'      => '#16a34a',
+                                    'reliever'     => '#d97706',
                                     'probationary' => '#2563eb',
                                     'contractual'  => '#7c3aed',
-                                    default     => '#6b7280',
+                                    'posted'       => '#0d9488',
+                                    default        => '#6b7280',
                                 };
-                                $statusLabel     = strtoupper(e($employeeStatus));
-                                $statusBadgeHtml = "<span style='background:{$statusColor};color:#fff;font-size:9px;font-weight:700;padding:2px 8px;border-radius:999px;margin-left:6px;'>{$statusLabel}</span>";
+                                $statusBadgeHtml = "
+                                    <span style='background:{$empStatusColor};color:#fff;font-size:9px;font-weight:700;
+                                        padding:2px 8px;border-radius:999px;margin-left:6px;letter-spacing:.04em;'>
+                                        " . strtoupper($employeeStatus) . "
+                                    </span>";
                             }
 
-                            $itemRows = '';
+                            $itemRows       = '';
                             $totalQty       = 0;
                             $totalReleased  = 0;
                             $totalRemaining = 0;
@@ -129,28 +163,32 @@ class UniformIssuancesTable
 
                                 $itemRows .= "
                                     <tr style='background:{$bg};'>
-                                        <td style='padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;color:#111827;font-weight:500;'>{$itemName}</td>
-                                        <td style='padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;color:#374151;text-align:center;'>{$size}</td>
-                                        <td style='padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;font-weight:700;text-align:center;color:#1d4ed8;'>{$qty}</td>
-                                        <td style='padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;font-weight:700;text-align:center;color:{$releasedColor};'>{$released}</td>
-                                        <td style='padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;font-weight:700;text-align:center;color:{$remainingColor};'>{$remaining}</td>
+                                        <td style='padding:9px 14px;border-bottom:1px solid #e5e7eb;font-size:13px;color:#111827;font-weight:500;'>{$itemName}</td>
+                                        <td style='padding:9px 14px;border-bottom:1px solid #e5e7eb;font-size:13px;color:#374151;text-align:center;'>{$size}</td>
+                                        <td style='padding:9px 14px;border-bottom:1px solid #e5e7eb;font-size:13px;font-weight:700;text-align:center;color:#1d4ed8;'>{$qty}</td>
+                                        <td style='padding:9px 14px;border-bottom:1px solid #e5e7eb;font-size:13px;font-weight:700;text-align:center;color:{$releasedColor};'>{$released}</td>
+                                        <td style='padding:9px 14px;border-bottom:1px solid #e5e7eb;font-size:13px;font-weight:700;text-align:center;color:{$remainingColor};'>{$remaining}</td>
                                     </tr>";
                             }
 
-                            // Totals footer row
+                            // Totals footer
                             $itemRows .= "
                                 <tr style='background:#eff6ff;border-top:2px solid #93c5fd;'>
-                                    <td colspan='2' style='padding:6px 10px;font-size:11px;font-weight:700;color:#374151;text-align:right;border-right:1px solid #cbd5e1;'>TOTAL</td>
-                                    <td style='padding:6px 10px;font-size:13px;font-weight:900;color:#1d4ed8;text-align:center;border-right:1px solid #cbd5e1;'>{$totalQty}</td>
-                                    <td style='padding:6px 10px;font-size:13px;font-weight:900;color:#16a34a;text-align:center;border-right:1px solid #cbd5e1;'>{$totalReleased}</td>
-                                    <td style='padding:6px 10px;font-size:13px;font-weight:900;color:#d97706;text-align:center;'>{$totalRemaining}</td>
+                                    <td colspan='2' style='padding:8px 14px;font-size:11px;font-weight:700;color:#374151;text-align:right;'>TOTAL</td>
+                                    <td style='padding:8px 14px;font-size:14px;font-weight:900;color:#1d4ed8;text-align:center;'>{$totalQty}</td>
+                                    <td style='padding:8px 14px;font-size:14px;font-weight:900;color:#16a34a;text-align:center;'>{$totalReleased}</td>
+                                    <td style='padding:8px 14px;font-size:14px;font-weight:900;color:#d97706;text-align:center;'>{$totalRemaining}</td>
                                 </tr>";
 
-                            $html .= "
-                                <div style='border:1px solid #e5e7eb;border-radius:8px;margin-bottom:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06);'>
+                            $grandTotalQty       += $totalQty;
+                            $grandTotalReleased  += $totalReleased;
+                            $grandTotalRemaining += $totalRemaining;
+
+                            $recipientBlocks .= "
+                                <div style='border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:12px;'>
                                     <div style='background:#1e3a5f;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;'>
                                         <div>
-                                            <div style='font-size:13px;font-weight:700;color:#fff;display:flex;align-items:center;gap:4px;'>
+                                            <div style='font-size:13px;font-weight:700;color:#fff;display:flex;align-items:center;'>
                                                 {$employee}{$statusBadgeHtml}
                                             </div>
                                             <div style='font-size:11px;color:#93c5fd;margin-top:2px;'>{$position}</div>
@@ -159,11 +197,11 @@ class UniformIssuancesTable
                                     <table style='width:100%;border-collapse:collapse;'>
                                         <thead>
                                             <tr style='background:#f1f5f9;'>
-                                                <th style='padding:7px 10px;text-align:left;font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e2e8f0;'>Item</th>
-                                                <th style='padding:7px 10px;text-align:center;font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e2e8f0;width:60px;'>Size</th>
-                                                <th style='padding:7px 10px;text-align:center;font-size:10px;font-weight:700;color:#1d4ed8;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e2e8f0;width:60px;'>Qty</th>
-                                                <th style='padding:7px 10px;text-align:center;font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e2e8f0;width:70px;'>Released</th>
-                                                <th style='padding:7px 10px;text-align:center;font-size:10px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e2e8f0;width:75px;'>Remaining</th>
+                                                <th style='padding:7px 14px;text-align:left;font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e2e8f0;'>Item</th>
+                                                <th style='padding:7px 14px;text-align:center;font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e2e8f0;width:60px;'>Size</th>
+                                                <th style='padding:7px 14px;text-align:center;font-size:10px;font-weight:700;color:#1d4ed8;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e2e8f0;width:60px;'>Qty</th>
+                                                <th style='padding:7px 14px;text-align:center;font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e2e8f0;width:75px;'>Released</th>
+                                                <th style='padding:7px 14px;text-align:center;font-size:10px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e2e8f0;width:80px;'>Remaining</th>
                                             </tr>
                                         </thead>
                                         <tbody>{$itemRows}</tbody>
@@ -171,30 +209,146 @@ class UniformIssuancesTable
                                 </div>";
                         }
 
+                        // ── Grand total bar ───────────────────────────────────
+                        $grandTotalBar = "
+                            <div style='border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:16px;'>
+                                <div style='background:#f1f5f9;padding:9px 14px;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.06em;'>
+                                    Grand Total
+                                </div>
+                                <div style='display:grid;grid-template-columns:1fr 1fr 1fr;'>
+                                    <div style='padding:12px 14px;text-align:center;border-right:1px solid #f1f5f9;'>
+                                        <div style='font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;'>Total Qty</div>
+                                        <div style='font-size:20px;font-weight:900;color:#1d4ed8;'>{$grandTotalQty}</div>
+                                    </div>
+                                    <div style='padding:12px 14px;text-align:center;border-right:1px solid #f1f5f9;'>
+                                        <div style='font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;'>Released</div>
+                                        <div style='font-size:20px;font-weight:900;color:#16a34a;'>{$grandTotalReleased}</div>
+                                    </div>
+                                    <div style='padding:12px 14px;text-align:center;'>
+                                        <div style='font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;'>Remaining</div>
+                                        <div style='font-size:20px;font-weight:900;color:#d97706;'>{$grandTotalRemaining}</div>
+                                    </div>
+                                </div>
+                            </div>";
+
+                        // ── Linked transmittals ───────────────────────────────
+                        $linkedTransmittalsHtml = '';
+                        $transmittals = \App\Models\Transmittals::where('uniform_issuance_id', $record->id)->get();
+
+                        if ($transmittals->count() > 0) {
+                            $txRows = '';
+                            foreach ($transmittals as $txn) {
+                                $txNum   = e($txn->transmittal_number);
+                                $txTo    = e($txn->transmitted_to);
+                                $txDate  = $txn->transmitted_at
+                                    ? \Carbon\Carbon::parse($txn->transmitted_at)->format('M d, Y')
+                                    : '—';
+                                $txStatusColor = match ($txn->status) {
+                                    'received_from_office' => '#0284c7',
+                                    'received_from_site'   => '#16a34a',
+                                    'document_returned'    => '#6b7280',
+                                    default                => '#d97706',
+                                };
+                                $txStatusLabel = match ($txn->status) {
+                                    'pending'              => 'PENDING',
+                                    'received_from_office' => 'RECV. OFFICE',
+                                    'received_from_site'   => 'RECV. SITE',
+                                    'document_returned'    => 'DOC RETURNED',
+                                    default                => strtoupper($txn->status),
+                                };
+                                $txRows .= "
+                                    <tr>
+                                        <td style='padding:8px 14px;border-bottom:1px solid #e5e7eb;font-size:12px;font-weight:600;color:#111827;'>{$txNum}</td>
+                                        <td style='padding:8px 14px;border-bottom:1px solid #e5e7eb;font-size:12px;color:#374151;'>{$txTo}</td>
+                                        <td style='padding:8px 14px;border-bottom:1px solid #e5e7eb;font-size:12px;color:#374151;text-align:center;'>{$txDate}</td>
+                                        <td style='padding:8px 14px;border-bottom:1px solid #e5e7eb;text-align:center;'>
+                                            <span style='background:{$txStatusColor};color:#fff;font-size:9.5px;font-weight:700;
+                                                padding:2px 8px;border-radius:999px;letter-spacing:.04em;'>{$txStatusLabel}</span>
+                                        </td>
+                                    </tr>";
+                            }
+
+                            $count = $transmittals->count();
+                            $linkedTransmittalsHtml = "
+                                <div style='margin-top:16px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;'>
+                                    <div style='background:#f1f5f9;padding:9px 14px;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.06em;'>
+                                        Transmittals ({$count})
+                                    </div>
+                                    <table style='width:100%;border-collapse:collapse;'>
+                                        <thead>
+                                            <tr style='background:#1e3a5f;'>
+                                                <th style='padding:8px 14px;text-align:left;font-size:10px;font-weight:700;color:#e0f2fe;text-transform:uppercase;letter-spacing:.05em;'>No.</th>
+                                                <th style='padding:8px 14px;text-align:left;font-size:10px;font-weight:700;color:#e0f2fe;text-transform:uppercase;letter-spacing:.05em;'>Transmitted To</th>
+                                                <th style='padding:8px 14px;text-align:center;font-size:10px;font-weight:700;color:#e0f2fe;text-transform:uppercase;letter-spacing:.05em;'>Date</th>
+                                                <th style='padding:8px 14px;text-align:center;font-size:10px;font-weight:700;color:#e0f2fe;text-transform:uppercase;letter-spacing:.05em;'>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>{$txRows}</tbody>
+                                    </table>
+                                </div>";
+                        }
+
                         return new \Illuminate\Support\HtmlString("
-                            <div style='max-height:600px;overflow-y:auto;padding:2px;'>
-                                {$html}
+                            <div style='font-family:\"DM Sans\",system-ui,sans-serif;'>
+
+                                <!-- ── Header card ── -->
+                                <div style='background:linear-gradient(135deg,#1e3a5f 0%,#1e40af 100%);
+                                    border-radius:12px;padding:18px 20px;margin-bottom:16px;'>
+                                    <div style='display:flex;justify-content:space-between;align-items:flex-start;'>
+                                        <div>
+                                            <div style='font-size:18px;font-weight:800;color:#fff;letter-spacing:-0.02em;'>
+                                                {$siteName}
+                                            </div>
+                                            <div style='font-size:12px;color:#93c5fd;margin-top:4px;'>
+                                                {$typeName}
+                                            </div>
+                                        </div>
+                                        <span style='background:{$statusColor};color:#fff;font-size:11px;font-weight:700;
+                                            padding:4px 14px;border-radius:999px;letter-spacing:.04em;white-space:nowrap;'>
+                                            {$statusLabel}
+                                        </span>
+                                    </div>
+                                    <div style='display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px;'>
+                                        <div style='background:rgba(255,255,255,.1);border-radius:8px;padding:10px 14px;'>
+                                            <div style='font-size:10px;color:#93c5fd;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;'>Status Date</div>
+                                            <div style='font-size:13px;font-weight:600;color:#fff;'>{$statusDateFormatted}</div>
+                                        </div>
+                                        <div style='background:rgba(255,255,255,.1);border-radius:8px;padding:10px 14px;'>
+                                            <div style='font-size:10px;color:#93c5fd;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;'>Issuance Type</div>
+                                            <div style='font-size:13px;font-weight:600;color:#fff;'>{$typeName}</div>
+                                        </div>
+                                        <div style='background:rgba(255,255,255,.08);border-radius:8px;padding:10px 14px;'>
+                                            <div style='font-size:10px;color:#93c5fd;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;'>Total Recipients</div>
+                                            <div style='font-size:13px;font-weight:600;color:#fff;'>" . $record->uniformIssuanceRecipient->count() . " employee(s)</div>
+                                        </div>
+                                        <div style='background:rgba(255,255,255,.08);border-radius:8px;padding:10px 14px;'>
+                                            <div style='font-size:10px;color:#93c5fd;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;'>For Transmit</div>
+                                            <div style='font-size:13px;font-weight:600;color:#fff;'>" . ($record->is_for_transmit ? 'Yes' : 'No') . "</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- ── Grand total bar ── -->
+                                {$grandTotalBar}
+
+                                <!-- ── Recipient blocks ── -->
+                                <div style='border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:4px;'>
+                                    <div style='background:#f1f5f9;padding:9px 14px;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.06em;'>
+                                        Recipients & Items
+                                    </div>
+                                    <div style='padding:12px;'>
+                                        {$recipientBlocks}
+                                    </div>
+                                </div>
+
+                                <!-- ── Linked transmittals ── -->
+                                {$linkedTransmittalsHtml}
+
                             </div>
                         ");
                     })
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Close'),
-
-                // ─── EDIT: only when pending ───────────────────────────────
-                EditAction::make()
-                    ->visible(fn ($record) => $record->uniform_issuance_status === 'pending')
-                    ->after(function ($record) {
-                        UniformIssuancesResource::syncQuantities($record);
-
-                        UniformIssuanceLog::create([
-                            'uniform_issuance_id' => $record->id,
-                            'user_id'             => Auth::id(),
-                            'action'              => 'edited',
-                            'status_from'         => null,
-                            'status_to'           => $record->uniform_issuance_status,
-                            'note'                => 'Record was edited.',
-                        ]);
-                    }),
 
                 // ─── ISSUED: pending or partial ────────────────────────────
                 Action::make('issued')
@@ -1053,6 +1207,102 @@ class UniformIssuancesTable
                     ->modalHeading('Receiving Copies')
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Close'),
+
+                    Action::make('transmit')
+                    ->label('Transmit')
+                    ->color('primary')
+                    ->icon('heroicon-o-paper-airplane')
+                    ->visible(fn ($record) =>
+                        in_array($record->uniform_issuance_status, ['partial', 'issued'])
+                        && ! $record->is_for_transmit
+                    )
+                    ->form([
+                        \Filament\Forms\Components\TextInput::make('transmitted_to')
+                            ->label('Transmitted To')
+                            ->placeholder('e.g. Site Manager / Supervisor name')
+                            ->required(),
+                        \Filament\Forms\Components\TextInput::make('transmitted_by')
+                            ->label('Transmitted By')
+                            ->default(fn () => Auth::user()?->name ?? '')
+                            ->required(),
+                        \Filament\Forms\Components\TextInput::make('purpose')
+                            ->label('Purpose')
+                            ->placeholder('e.g. New hire uniform issuance'),
+                        \Filament\Forms\Components\TextInput::make('instructions')
+                            ->label('Instructions')
+                            ->placeholder('e.g. Please sign and return copy'),
+                    ])
+                    ->action(function ($record, array $data, Action $action) {
+                        $record->loadMissing(
+                            'uniformIssuanceRecipient.uniformIssuanceItem.uniformItem',
+                            'uniformIssuanceRecipient.uniformIssuanceItem.uniformItemVariant'
+                        );
+ 
+                        $summaryMap = [];
+                        foreach ($record->uniformIssuanceRecipient as $recipient) {
+                            foreach ($recipient->uniformIssuanceItem as $item) {
+                                $qty = (int) ($item->released_quantity ?: $item->quantity);
+                                if ($qty <= 0) continue;
+ 
+                                $itemName = $item->uniformItem?->uniform_item_name ?? '—';
+                                $size     = $item->uniformItemVariant?->uniform_item_size ?? '—';
+                                $key      = $itemName . '||' . $size;
+ 
+                                if (!isset($summaryMap[$key])) {
+                                    $summaryMap[$key] = ['item_name' => $itemName, 'size' => $size, 'qty' => 0];
+                                }
+                                $summaryMap[$key]['qty'] += $qty;
+                            }
+                        }
+ 
+                        if (empty($summaryMap)) {
+                            Notification::make()
+                                ->title('Nothing to Transmit')
+                                ->body('No issued items found on this issuance.')
+                                ->warning()
+                                ->send();
+                            $action->halt();
+                            return;
+                        }
+ 
+                        $transmittal = \App\Models\Transmittals::create([
+                            'uniform_issuance_id' => $record->id,
+                            'transmittal_number'  => \App\Models\Transmittals::generateNumber(),
+                            'transmitted_by'      => $data['transmitted_by'],
+                            'transmitted_to'      => $data['transmitted_to'],
+                            'purpose'             => $data['purpose'] ?? '',
+                            'instructions'        => $data['instructions'] ?? '',
+                            'items_summary'       => array_values($summaryMap),
+                            'transmitted_at'      => now()->toDateString(),
+                            'status'              => 'pending',
+                        ]);
+ 
+                        // Attach via pivot
+                        $transmittal->issuances()->attach($record->id);
+ 
+                        // Tag as transmitted
+                        $record->update(['is_for_transmit' => true]);
+ 
+                        $url = route('uniform-issuances.transmittal', [
+                            'issuance'    => $record->id,
+                            'transmittal' => $transmittal->id,
+                        ]);
+ 
+                        Notification::make()
+                            ->title('Transmittal Created')
+                            ->body("{$transmittal->transmittal_number} created successfully.")
+                            ->success()
+                            ->actions([
+                                \Filament\Actions\Action::make('open')
+                                    ->label('Open Transmittal')
+                                    ->url($url)
+                                    ->openUrlInNewTab()
+                                    ->button(),
+                            ])
+                            ->persistent()
+                            ->send();
+                    }),
+
 
                 Action::make('for_delivery_receipt')
                     ->label('For Delivery Receipt')
@@ -2338,6 +2588,318 @@ class UniformIssuancesTable
                                 ->persistent()
                                 ->send();
                         }),
+
+                    // ─── BULK: FOR DELIVERY RECEIPT ────────────────────────
+                    BulkAction::make('bulk_for_delivery_receipt')
+                        ->label('For Delivery Receipt')
+                        ->icon('heroicon-o-document-check')
+                        ->color('success')
+                        ->deselectRecordsAfterCompletion()
+                        ->form([
+                            \Filament\Forms\Components\TextInput::make('endorse_by')
+                                ->label('Endorsed By')
+                                ->default(fn () => Auth::user()?->name ?? '')
+                                ->required(),
+                            \Filament\Forms\Components\DatePicker::make('endorse_date')
+                                ->label('Endorse Date')
+                                ->default(now()->toDateString())
+                                ->required(),
+                            \Filament\Forms\Components\TextInput::make('remarks')
+                                ->label('Remarks')
+                                ->placeholder('Optional notes or instructions'),
+                        ])
+                        ->action(function (Collection $records, array $data) {
+                            $drEligibleTypes = ['new hire', 'additional', 'annual'];
+ 
+                            $results   = ['created' => 0, 'skipped' => [], 'errors' => []];
+ 
+                            foreach ($records as $record) {
+                                // ── Must be partial or issued ──
+                                if (!in_array($record->uniform_issuance_status, ['partial', 'issued'])) {
+                                    $results['skipped'][] = "#{$record->id}: Not partial/issued (status: {$record->uniform_issuance_status})";
+                                    continue;
+                                }
+ 
+                                // ── Must be DR-eligible type ──
+                                $typeName = strtolower($record->uniformIssuanceType?->uniform_issuance_type_name ?? '');
+                                $isDrType = false;
+                                foreach ($drEligibleTypes as $t) {
+                                    if (str_contains($typeName, $t)) { $isDrType = true; break; }
+                                }
+                                if (!$isDrType) {
+                                    $results['skipped'][] = "#{$record->id}: Type '{$typeName}' not eligible for DR (must be new hire, additional, or annual)";
+                                    continue;
+                                }
+ 
+                                // ── Already has a DR ──
+                                if (\App\Models\ForDeliveryReceipt::where('uniform_issuance_id', $record->id)->exists()) {
+                                    $results['skipped'][] = "#{$record->id}: DR already exists";
+                                    continue;
+                                }
+ 
+                                // ── Must have at least one non-reliever ──
+                                $record->loadMissing(
+                                    'uniformIssuanceRecipient.uniformIssuanceItem.uniformItem',
+                                    'uniformIssuanceRecipient.uniformIssuanceItem.uniformItemVariant',
+                                    'uniformIssuanceRecipient.position'
+                                );
+ 
+                                $hasNonReliever = $record->uniformIssuanceRecipient->contains(function ($recipient) {
+                                    return strtolower($recipient->position?->position_name ?? '') !== 'reliever'
+                                        && strtolower($recipient->employee_status ?? '') !== 'reliever';
+                                });
+ 
+                                if (!$hasNonReliever) {
+                                    $results['skipped'][] = "#{$record->id}: All recipients are relievers";
+                                    continue;
+                                }
+ 
+                                // ── Build item summary ──
+                                $grouped = [];
+                                foreach ($record->uniformIssuanceRecipient as $recipient) {
+                                    $isReliever = strtolower($recipient->position?->position_name ?? '') === 'reliever'
+                                        || strtolower($recipient->employee_status ?? '') === 'reliever';
+                                    if ($isReliever) continue;
+ 
+                                    $employeeName  = $recipient->employee_name ?? '—';
+                                    $employeeItems = [];
+ 
+                                    foreach ($recipient->uniformIssuanceItem as $item) {
+                                        $qty = (int) $item->released_quantity;
+                                        if ($qty <= 0) continue;
+                                        $key = $item->uniform_item_id . '_' . $item->uniform_item_variant_id;
+                                        if (!isset($employeeItems[$key])) {
+                                            $employeeItems[$key] = [
+                                                'employee'  => $employeeName,
+                                                'item_name' => $item->uniformItem?->uniform_item_name ?? '—',
+                                                'size'      => $item->uniformItemVariant?->uniform_item_size ?? '—',
+                                                'qty'       => 0,
+                                            ];
+                                        }
+                                        $employeeItems[$key]['qty'] += $qty;
+                                    }
+ 
+                                    if (!empty($employeeItems)) {
+                                        foreach ($employeeItems as $row) {
+                                            $grouped[] = $row;
+                                        }
+                                    }
+                                }
+ 
+                                if (empty($grouped)) {
+                                    $results['skipped'][] = "#{$record->id}: No released items found";
+                                    continue;
+                                }
+ 
+                                try {
+                                    \App\Models\ForDeliveryReceipt::create([
+                                        'uniform_issuance_id' => $record->id,
+                                        'endorse_by'          => $data['endorse_by'],
+                                        'endorse_date'        => $data['endorse_date'] ?? now()->toDateString(),
+                                        'item_summary'        => $grouped,
+                                        'status'              => 'pending',
+                                        'done_date'           => null,
+                                        'cancel_date'         => null,
+                                        'remarks'             => $data['remarks'] ?? null,
+                                    ]);
+                                    $results['created']++;
+                                } catch (\Throwable $e) {
+                                    $results['errors'][] = "#{$record->id}: " . $e->getMessage();
+                                }
+                            }
+ 
+                            // ── Result notification ──
+                            $body = "{$results['created']} DR(s) created.";
+                            if (!empty($results['skipped'])) {
+                                $body .= "\n\nSkipped (" . count($results['skipped']) . "):\n" . implode("\n", array_slice($results['skipped'], 0, 5));
+                                if (count($results['skipped']) > 5) $body .= "\n... and " . (count($results['skipped']) - 5) . " more.";
+                            }
+                            if (!empty($results['errors'])) {
+                                $body .= "\n\nErrors (" . count($results['errors']) . "):\n" . implode("\n", array_slice($results['errors'], 0, 3));
+                            }
+ 
+                            $hasIssues = !empty($results['skipped']) || !empty($results['errors']);
+                            Notification::make()
+                                ->title($results['created'] > 0 ? 'Delivery Receipts Created' : 'No DRs Created')
+                                ->body($body)
+                                ->{$hasIssues ? ($results['created'] > 0 ? 'warning' : 'danger') : 'success'}()
+                                ->send();
+                        }),
+
+                    // ─── BULK: BILLING ─────────────────────────────────────
+                    BulkAction::make('bulk_billing')
+                        ->label('Billing')
+                        ->icon('heroicon-o-banknotes')
+                        ->color('warning')
+                        ->deselectRecordsAfterCompletion()
+                        ->requiresConfirmation()
+                        ->modalHeading('Bulk Billing')
+                        ->modalDescription('This will create billing records for all eligible selected issuances. Each issuance must have a DR (for client types) or be salary deduct type, must not have existing billing, and must have non-reliever recipients with released items.')
+                        ->modalSubmitActionLabel('Create Billings')
+                        ->action(function (Collection $records) {
+                            $billableTypes  = ['new hire', 'additional', 'annual', 'salary deduct'];
+                            $results        = ['created' => 0, 'skipped' => [], 'errors' => []];
+ 
+                            foreach ($records as $record) {
+                                // ── Must be partial or issued ──
+                                if (!in_array($record->uniform_issuance_status, ['partial', 'issued'])) {
+                                    $results['skipped'][] = "#{$record->id}: Not partial/issued";
+                                    continue;
+                                }
+ 
+                                // ── Must be billable type ──
+                                $typeName       = strtolower($record->uniformIssuanceType?->uniform_issuance_type_name ?? '');
+                                $isBillableType = false;
+                                foreach ($billableTypes as $t) {
+                                    if (str_contains($typeName, $t)) { $isBillableType = true; break; }
+                                }
+                                if (!$isBillableType) {
+                                    $results['skipped'][] = "#{$record->id}: Type '{$typeName}' not billable";
+                                    continue;
+                                }
+ 
+                                $isSalaryDeduct  = str_contains($typeName, 'salary deduct');
+                                $isClientBilling = !$isSalaryDeduct;
+ 
+                                // ── Already has billing ──
+                                if (\App\Models\UniformIssuanceBilling::where('uniform_issuance_id', $record->id)->exists()) {
+                                    $results['skipped'][] = "#{$record->id}: Billing already exists";
+                                    continue;
+                                }
+ 
+                                $record->loadMissing(
+                                    'uniformIssuanceRecipient.uniformIssuanceItem.uniformItem',
+                                    'uniformIssuanceRecipient.uniformIssuanceItem.uniformItemVariant',
+                                    'uniformIssuanceRecipient.position',
+                                    'site',
+                                    'uniformIssuanceType'
+                                );
+ 
+                                // ── Client billing requires a DR ──
+                                if ($isClientBilling && !\App\Models\ForDeliveryReceipt::where('uniform_issuance_id', $record->id)->exists()) {
+                                    $results['skipped'][] = "#{$record->id}: Client billing requires a Delivery Receipt first";
+                                    continue;
+                                }
+ 
+                                // ── Must have at least one non-reliever ──
+                                $recipients = $record->uniformIssuanceRecipient;
+                                $allRelievers = $recipients->every(function ($recipient) {
+                                    return strtolower($recipient->position?->position_name ?? '') === 'reliever'
+                                        || strtolower($recipient->employee_status ?? '') === 'reliever';
+                                });
+                                if ($allRelievers) {
+                                    $results['skipped'][] = "#{$record->id}: All recipients are relievers";
+                                    continue;
+                                }
+ 
+                                // ── Build billing items ──
+                                $grouped       = [];
+                                $recipientMeta = [];
+ 
+                                foreach ($record->uniformIssuanceRecipient as $recipient) {
+                                    $isReliever = strtolower($recipient->position?->position_name ?? '') === 'reliever'
+                                        || strtolower($recipient->employee_status ?? '') === 'reliever';
+                                    if ($isClientBilling && $isReliever) continue;
+ 
+                                    $employeeName  = $recipient->employee_name ?? '—';
+                                    $employeeItems = [];
+ 
+                                    foreach ($recipient->uniformIssuanceItem as $item) {
+                                        $qty = (int) $item->released_quantity;
+                                        if ($qty <= 0) continue;
+                                        $key = $item->uniform_item_id . '_' . $item->uniform_item_variant_id;
+                                        if (!isset($employeeItems[$key])) {
+                                            $employeeItems[$key] = [
+                                                'employee'   => $employeeName,
+                                                'item_name'  => $item->uniformItem?->uniform_item_name ?? '—',
+                                                'size'       => $item->uniformItemVariant?->uniform_item_size ?? '—',
+                                                'quantity'   => 0,
+                                                'unit_price' => (float) ($item->uniformItem?->uniform_item_price ?? 0),
+                                            ];
+                                        }
+                                        $employeeItems[$key]['quantity'] += $qty;
+                                    }
+ 
+                                    if (!empty($employeeItems)) {
+                                        $grouped[$employeeName]       = array_values($employeeItems);
+                                        $recipientMeta[$employeeName] = ['employee_status' => strtolower($recipient->employee_status ?? '')];
+                                    }
+                                }
+ 
+                                if (empty($grouped)) {
+                                    $results['skipped'][] = "#{$record->id}: No released items found";
+                                    continue;
+                                }
+ 
+                                $billingItemsFlat = [];
+                                foreach ($grouped as $empItems) {
+                                    foreach ($empItems as $row) {
+                                        $billingItemsFlat[] = $row;
+                                    }
+                                }
+ 
+                                $computeTotal = fn (array $items) => array_sum(
+                                    array_map(fn ($i) => (float) ($i['unit_price'] ?? 0) * (int) ($i['quantity'] ?? 0), $items)
+                                );
+ 
+                                try {
+                                    if ($isClientBilling) {
+                                        $total = $computeTotal($billingItemsFlat);
+                                        \App\Models\UniformIssuanceBilling::create([
+                                            'uniform_issuance_id'   => $record->id,
+                                            'billed_to'             => $record->site?->client?->client_name ?? $record->site?->site_name ?? '—',
+                                            'billing_type'          => 'client',
+                                            'billing_items'         => $billingItemsFlat,
+                                            'employee_attachments'  => null,
+                                            'total_price'           => $total,
+                                            'status'                => 'pending',
+                                            'billed_at'             => null,
+                                            'created_by'            => Auth::id(),
+                                            'signed_receiving_copy' => null,
+                                        ]);
+                                        $results['created']++;
+ 
+                                    } elseif ($isSalaryDeduct) {
+                                        foreach ($grouped as $employeeName => $items) {
+                                            $total = $computeTotal($items);
+                                            \App\Models\UniformIssuanceBilling::create([
+                                                'uniform_issuance_id'   => $record->id,
+                                                'billed_to'             => $employeeName,
+                                                'billing_type'          => 'salary_deduct',
+                                                'billing_items'         => $items,
+                                                'employee_attachments'  => null,
+                                                'total_price'           => $total,
+                                                'status'                => 'pending',
+                                                'billed_at'             => null,
+                                                'created_by'            => Auth::id(),
+                                                'signed_receiving_copy' => null,
+                                            ]);
+                                        }
+                                        $results['created']++;
+                                    }
+                                } catch (\Throwable $e) {
+                                    $results['errors'][] = "#{$record->id}: " . $e->getMessage();
+                                }
+                            }
+ 
+                            // ── Result notification ──
+                            $body = "{$results['created']} issuance(s) billed.";
+                            if (!empty($results['skipped'])) {
+                                $body .= "\n\nSkipped (" . count($results['skipped']) . "):\n" . implode("\n", array_slice($results['skipped'], 0, 6));
+                                if (count($results['skipped']) > 6) $body .= "\n... and " . (count($results['skipped']) - 6) . " more.";
+                            }
+                            if (!empty($results['errors'])) {
+                                $body .= "\n\nErrors (" . count($results['errors']) . "):\n" . implode("\n", array_slice($results['errors'], 0, 3));
+                            }
+ 
+                            $hasIssues = !empty($results['skipped']) || !empty($results['errors']);
+                            Notification::make()
+                                ->title($results['created'] > 0 ? 'Billings Created' : 'No Billings Created')
+                                ->body($body)
+                                ->{$hasIssues ? ($results['created'] > 0 ? 'warning' : 'danger') : 'success'}()
+                                ->send();
+                        }),
+                
                 ]),
             ]);
     }

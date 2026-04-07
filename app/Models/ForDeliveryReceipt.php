@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ForDeliveryReceipt extends Model
 {
@@ -30,5 +31,10 @@ class ForDeliveryReceipt extends Model
     public function uniformIssuance(): BelongsTo
     {
         return $this->belongsTo(UniformIssuances::class, 'uniform_issuance_id');
+    }
+
+    public function issuanceDrs(): HasMany
+    {
+        return $this->hasMany(IssuanceDr::class, 'for_delivery_receipt_id');
     }
 }

@@ -20,6 +20,8 @@ class BillingsTable
             ->columns([
                 TextColumn::make('invoice_number')
                     ->searchable(),
+                TextColumn::make('billing_title')
+                    ->searchable(),
                 TextColumn::make('client.client_name')
                     ->searchable(),
                 TextColumn::make('billing_start_period')
