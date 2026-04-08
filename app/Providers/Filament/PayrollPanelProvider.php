@@ -22,6 +22,7 @@ use Filament\Navigation\MenuItem;
 use App\Filament\Resources\Billings\BillingResource;
 use App\Filament\Resources\UniformIssuanceBillings\UniformIssuanceBillingResource;
 use Filament\Navigation\NavigationGroup;
+use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 
 class PayrollPanelProvider extends PanelProvider
 {
@@ -42,6 +43,9 @@ class PayrollPanelProvider extends PanelProvider
                BillingResource::class,
                UniformIssuanceBillingResource::class,
 
+            ])
+            ->plugins([
+                FilamentShieldPlugin::make(),
             ])
             ->discoverResources(in: app_path('Filament/Payroll/Resources'), for: 'App\Filament\Payroll\Resources')
             ->discoverPages(in: app_path('Filament/Payroll/Pages'), for: 'App\Filament\Payroll\Pages')

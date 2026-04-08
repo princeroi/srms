@@ -18,6 +18,7 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 
 class ManagementPanelProvider extends PanelProvider
 {
@@ -28,6 +29,9 @@ class ManagementPanelProvider extends PanelProvider
             ->path('management')
             ->colors([
                 'primary' => Color::Amber,
+            ])
+            ->plugins([
+                FilamentShieldPlugin::make(),
             ])
             ->discoverResources(in: app_path('Filament/Management/Resources'), for: 'App\Filament\Management\Resources')
             ->discoverPages(in: app_path('Filament/Management/Pages'), for: 'App\Filament\Management\Pages')

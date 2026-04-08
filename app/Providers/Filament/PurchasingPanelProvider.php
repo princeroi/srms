@@ -19,7 +19,7 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Filament\Navigation\MenuItem;
-
+use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 
 class PurchasingPanelProvider extends PanelProvider
 {
@@ -38,6 +38,9 @@ class PurchasingPanelProvider extends PanelProvider
             ])
             ->resources([
 
+            ])
+            ->plugins([
+                FilamentShieldPlugin::make(),
             ])
             ->discoverResources(in: app_path('Filament/Purchasing/Resources'), for: 'App\Filament\Purchasing\Resources')
             ->discoverPages(in: app_path('Filament/Purchasing/Pages'), for: 'App\Filament\Purchasing\Pages')
