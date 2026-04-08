@@ -18,7 +18,12 @@ class UniformRestocksResource extends Resource
 {
     protected static ?string $model = UniformRestocks::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowLeftEndOnRectangle;
+
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Stock & Inventory';
+    }
 
     public static function form(Schema $schema): Schema
     {

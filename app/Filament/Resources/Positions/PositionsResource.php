@@ -18,7 +18,12 @@ class PositionsResource extends Resource
 {
     protected static ?string $model = Positions::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBriefcase;
+
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Organizations';
+    }
 
     public static function form(Schema $schema): Schema
     {

@@ -18,7 +18,12 @@ class UniformIssuanceBillingResource extends Resource
 {
     protected static ?string $model = UniformIssuanceBilling::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBanknotes;
+
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Billing Management';
+    }
 
     public static function form(Schema $schema): Schema
     {

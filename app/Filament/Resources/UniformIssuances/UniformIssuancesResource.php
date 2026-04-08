@@ -18,7 +18,12 @@ class UniformIssuancesResource extends Resource
 {
     protected static ?string $model = UniformIssuances::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowRightStartOnRectangle;
+
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Distributions';
+    }
 
     public static function form(Schema $schema): Schema
     {

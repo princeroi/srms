@@ -18,9 +18,14 @@ class UniformSetsResource extends Resource
 {
     protected static ?string $model = UniformSets::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCircleStack;
 
     protected static ?string $recordTitleAttribute = '\\';
+
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Uniform Setup';
+    }
 
     public static function form(Schema $schema): Schema
     {

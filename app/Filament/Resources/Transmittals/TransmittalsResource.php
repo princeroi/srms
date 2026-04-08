@@ -18,7 +18,12 @@ class TransmittalsResource extends Resource
 {
     protected static ?string $model = Transmittals::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowTopRightOnSquare;
+
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Distributions';
+    }
 
     public static function form(Schema $schema): Schema
     {

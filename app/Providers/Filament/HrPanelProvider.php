@@ -19,7 +19,17 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Filament\Navigation\MenuItem;
-
+use App\Filament\Resources\UniformCategories\UniformCategoryResource;
+use App\Filament\Resources\Clients\ClientsResource;
+use App\Filament\Resources\Positions\PositionsResource;
+use App\Filament\Resources\Sites\SitesResource;
+use App\Filament\Resources\Transmittals\TransmittalsResource;
+use App\Filament\Resources\UniformIssuances\UniformIssuancesResource;
+use App\Filament\Resources\UniformItems\UniformItemsResource;
+use App\Filament\Resources\UniformItemVariants\UniformItemVariantsResource;
+use App\Filament\Resources\UniformRestocks\UniformRestocksResource;
+use App\Filament\Resources\UniformSets\UniformSetsResource;
+use Filament\Navigation\NavigationGroup;
 
 class HrPanelProvider extends PanelProvider
 {
@@ -34,10 +44,19 @@ class HrPanelProvider extends PanelProvider
                     ->url(fn() => route('logout')),
             ])   
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => Color::Blue,
             ])
             ->resources([
-                
+                UniformCategoryResource::class,
+                ClientsResource::class,
+                PositionsResource::class,
+                SitesResource::class,
+                TransmittalsResource::class,
+                UniformIssuancesResource::class,
+                UniformItemsResource::class,
+                UniformItemVariantsResource::class,
+                UniformRestocksResource::class,
+                UniformSetsResource::class,
             ])
             ->discoverResources(in: app_path('Filament/Hr/Resources'), for: 'App\Filament\Hr\Resources')
             ->discoverPages(in: app_path('Filament/Hr/Pages'), for: 'App\Filament\Hr\Pages')
@@ -62,6 +81,21 @@ class HrPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+            ])
+            ->viteTheme('resources/css/filament/theme.css')
+            ->navigationGroups([
+                NavigationGroup::make()
+                    ->label('Organizations')
+                    ->collapsed(false), 
+                NavigationGroup::make()
+                    ->label('Uniform Setup')
+                    ->collapsed(false), 
+                NavigationGroup::make()
+                    ->label('Distributions')
+                    ->collapsed(false),
+                NavigationGroup::make()
+                    ->label('Stock & Inventory')
+                    ->collapsed(false),
             ]);
     }
 }

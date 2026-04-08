@@ -18,11 +18,16 @@ class ClientsResource extends Resource
 {
     protected static ?string $model = Clients::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingOffice2;
 
     public static function form(Schema $schema): Schema
     {
         return ClientsForm::configure($schema);
+    }
+
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Organizations';
     }
 
     public static function table(Table $table): Table

@@ -268,7 +268,7 @@ label,
     letter-spacing: 0.09em;
     text-transform: uppercase;
     color: var(--fi-text-muted);
-    padding: 1.125rem 1rem 0.3125rem 1rem;
+    padding: 0 1rem 0 1rem;
     display: block;
     user-select: none;
 }
@@ -277,11 +277,11 @@ label,
 .fi-sidebar-item {
     list-style: none;
     margin: 0;
-    padding: 0 0.5rem;
+    padding: 0 0 0 2rem;
 }
 
 .fi-sidebar-item {
-    margin: 6px; /* top/bottom + left/right */
+    margin: 0; /* top/bottom + left/right */
 }
 
 /* ── Button — default ──

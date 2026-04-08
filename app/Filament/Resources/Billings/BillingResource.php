@@ -18,7 +18,12 @@ class BillingResource extends Resource
 {
     protected static ?string $model = Billing::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentText;
+
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Billing Management';
+    }
 
     public static function form(Schema $schema): Schema
     {

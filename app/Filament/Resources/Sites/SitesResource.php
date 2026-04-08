@@ -18,7 +18,12 @@ class SitesResource extends Resource
 {
     protected static ?string $model = Sites::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedMapPin;
+
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Organizations';
+    }
 
     public static function form(Schema $schema): Schema
     {

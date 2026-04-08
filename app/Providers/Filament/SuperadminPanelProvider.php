@@ -19,7 +19,7 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Filament\Navigation\MenuItem;
-
+use Filament\Navigation\NavigationGroup;
 
 class SuperadminPanelProvider extends PanelProvider
 {
@@ -62,6 +62,27 @@ class SuperadminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ])
-            ->viteTheme('resources/css/filament/theme.css');
+            ->viteTheme('resources/css/filament/theme.css')
+            ->navigationGroups([
+                NavigationGroup::make()
+                    ->label('Organizations')
+                    ->collapsed(false), 
+                NavigationGroup::make()
+                    ->label('Uniform Setup')
+                    ->collapsed(false), 
+                NavigationGroup::make()
+                    ->label('Distributions')
+                    ->collapsed(false),
+                NavigationGroup::make()
+                    ->label('Stock & Inventory')
+                    ->collapsed(false),
+                NavigationGroup::make()
+                    ->label('Billing Management')
+                    ->collapsed(false), 
+                NavigationGroup::make()
+                    ->label('User Management')
+                    ->collapsed(false),
+                
+            ]);
     }
 }
